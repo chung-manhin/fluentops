@@ -9,8 +9,12 @@ describe('App (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
-  const testUser = {
-    email: `test-${Date.now()}@example.com`,
+  const userA = {
+    email: `test-a-${Date.now()}@example.com`,
+    password: 'password123',
+  };
+  const userB = {
+    email: `test-b-${Date.now()}@example.com`,
     password: 'password123',
   };
 
@@ -35,8 +39,8 @@ describe('App (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.recording.deleteMany({ where: { user: { email: testUser.email } } });
-    await prisma.user.deleteMany({ where: { email: testUser.email } });
+    await prisma.recording.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+    await prisma.user.deleteMany({ where: { email: { in: [userA.email, userB.email] } } });
     await app.close();
   });
 
@@ -54,17 +58,17 @@ describe('App (e2e)', () => {
     it('POST /auth/register', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/register')
-        .send(testUser)
+        .send(userA)
         .expect(201);
 
       expect(res.body).toHaveProperty('id');
-      expect(res.body.email).toBe(testUser.email);
+      expect(res.body.email).toBe(userA.email);
     });
 
     it('POST /auth/login', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/login')
-        .send(testUser)
+        .send(userA)
         .expect(200);
 
       expect(res.body).toHaveProperty('accessToken');
@@ -79,7 +83,7 @@ describe('App (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
-      expect(res.body.email).toBe(testUser.email);
+      expect(res.body.email).toBe(userA.email);
     });
 
     it('POST /auth/refresh (rotation)', async () => {
@@ -101,7 +105,7 @@ describe('App (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
-      expect(res.body.email).toBe(testUser.email);
+      expect(res.body.email).toBe(userA.email);
     });
 
     it('POST /auth/logout', async () => {
@@ -119,61 +123,102 @@ describe('App (e2e)', () => {
     });
   });
 
-  describe('Media flow: presign -> complete -> list -> detail', () => {
-    let accessToken: string;
+  describe('Media flow: presign -> complete -> list -> detail + isolation', () => {
+    let tokenA: string;
+    let tokenB: string;
+    let objectKey: string;
     let recordingId: string;
 
     beforeAll(async () => {
-      const res = await request(app.getHttpServer())
+      // login userA
+      const resA = await request(app.getHttpServer())
         .post('/auth/login')
-        .send(testUser)
+        .send(userA)
         .expect(200);
-      accessToken = res.body.accessToken;
+      tokenA = resA.body.accessToken;
+
+      // register + login userB
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send(userB)
+        .expect(201);
+      const resB = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send(userB)
+        .expect(200);
+      tokenB = resB.body.accessToken;
     });
 
-    it('POST /media/presign', async () => {
+    it('POST /media/presign returns uploadUrl, objectKey, fileUrl', async () => {
       const res = await request(app.getHttpServer())
         .post('/media/presign')
-        .set('Authorization', `Bearer ${accessToken}`)
-        .send({ filename: 'test.webm' })
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ filename: 'test.webm', contentType: 'audio/webm' })
+        .expect(200);
+
+      expect(res.body).toHaveProperty('uploadUrl');
+      expect(res.body).toHaveProperty('objectKey');
+      expect(res.body).toHaveProperty('fileUrl');
+      expect(res.body.objectKey).toContain('recordings/');
+      objectKey = res.body.objectKey;
+    });
+
+    it('POST /media/presign rejects invalid contentType', async () => {
+      await request(app.getHttpServer())
+        .post('/media/presign')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ filename: 'test.mp4', contentType: 'video/mp4' })
+        .expect(400);
+    });
+
+    it('POST /media/complete writes to DB', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/media/complete')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ objectKey, sizeBytes: 12345, mimeType: 'audio/webm', durationMs: 5000 })
         .expect(200);
 
       expect(res.body).toHaveProperty('id');
-      expect(res.body).toHaveProperty('uploadUrl');
-      expect(res.body).toHaveProperty('objectKey');
+      expect(res.body).toHaveProperty('url');
+      expect(res.body).toHaveProperty('createdAt');
       recordingId = res.body.id;
     });
 
-    it('POST /media/:id/complete', async () => {
-      const res = await request(app.getHttpServer())
-        .post(`/media/${recordingId}/complete`)
-        .set('Authorization', `Bearer ${accessToken}`)
-        .send({ bytes: 12345 })
-        .expect(200);
-
-      expect(res.body.status).toBe('UPLOADED');
-      expect(res.body.bytes).toBe(12345);
-    });
-
-    it('GET /media (list)', async () => {
+    it('GET /media lists recordings for current user', async () => {
       const res = await request(app.getHttpServer())
         .get('/media')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThanOrEqual(1);
-      expect(res.body[0].filename).toBe('test.webm');
+      expect(res.body[0]).toHaveProperty('url');
     });
 
-    it('GET /media/:id (detail with playUrl)', async () => {
+    it('GET /media/:id returns detail with playUrl', async () => {
       const res = await request(app.getHttpServer())
         .get(`/media/${recordingId}`)
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
       expect(res.body.id).toBe(recordingId);
       expect(res.body).toHaveProperty('playUrl');
+    });
+
+    it('userB cannot see userA recordings via GET /media', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/media')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200);
+
+      expect(res.body.length).toBe(0);
+    });
+
+    it('userB cannot access userA recording detail', async () => {
+      await request(app.getHttpServer())
+        .get(`/media/${recordingId}`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(404);
     });
 
     it('GET /media without auth returns 401', () => {

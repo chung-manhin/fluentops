@@ -3,9 +3,7 @@
     <header class="border-b bg-white">
       <div class="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
         <h1 class="text-lg font-semibold">Speaking Practice</h1>
-        <div class="flex gap-2">
-          <el-button @click="$router.push('/dashboard')">Dashboard</el-button>
-        </div>
+        <el-button @click="$router.push('/dashboard')">Dashboard</el-button>
       </div>
     </header>
 
@@ -15,17 +13,24 @@
         <template #header><h2 class="text-lg font-medium">Record</h2></template>
         <div class="flex items-center gap-4">
           <el-button
-            v-if="!recording"
+            v-if="state === 'idle'"
             type="danger"
             @click="startRecording"
             :disabled="uploading"
           >
             Start Recording
           </el-button>
-          <el-button v-else type="warning" @click="stopRecording">
-            Stop Recording
+          <el-button v-if="state === 'recording'" type="warning" @click="pauseRecording">
+            Pause
           </el-button>
-          <span v-if="recording" class="text-sm text-red-500 animate-pulse">● Recording…</span>
+          <el-button v-if="state === 'paused'" type="success" @click="resumeRecording">
+            Resume
+          </el-button>
+          <el-button v-if="state !== 'idle'" type="info" @click="stopRecording">
+            Stop
+          </el-button>
+          <span v-if="state === 'recording'" class="text-sm text-red-500 animate-pulse">● Recording…</span>
+          <span v-if="state === 'paused'" class="text-sm text-yellow-500">⏸ Paused</span>
           <span v-if="uploading" class="text-sm text-blue-500">Uploading…</span>
         </div>
       </el-card>
@@ -36,8 +41,8 @@
         <div v-if="recordings.length === 0" class="text-gray-400 text-sm">No recordings yet.</div>
         <div v-for="rec in recordings" :key="rec.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
           <div>
-            <p class="text-sm font-medium">{{ rec.filename }}</p>
-            <p class="text-xs text-gray-400">{{ new Date(rec.createdAt).toLocaleString() }}</p>
+            <p class="text-sm font-medium">{{ rec.objectKey.split('/').pop() }}</p>
+            <p class="text-xs text-gray-400">{{ new Date(rec.createdAt).toLocaleString() }} · {{ formatBytes(rec.sizeBytes) }}</p>
           </div>
           <el-button size="small" @click="play(rec.id)">Play</el-button>
         </div>
@@ -54,57 +59,78 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { ElMessage } from 'element-plus';
 import { http } from '../lib/http';
 
-interface Recording {
+interface RecordingItem {
   id: string;
-  filename: string;
+  objectKey: string;
+  sizeBytes: number;
   createdAt: string;
+  url: string;
 }
 
-const recording = ref(false);
+const state = ref<'idle' | 'recording' | 'paused'>('idle');
 const uploading = ref(false);
-const recordings = ref<Recording[]>([]);
+const recordings = ref<RecordingItem[]>([]);
 const playUrl = ref<string | null>(null);
 
 let mediaRecorder: MediaRecorder | null = null;
+let stream: MediaStream | null = null;
 let chunks: Blob[] = [];
+let recordStart = 0;
 
 async function loadRecordings() {
-  const { data } = await http.get<Recording[]>('/media');
+  const { data } = await http.get<RecordingItem[]>('/media');
   recordings.value = data;
 }
 
 onMounted(loadRecordings);
 
 async function startRecording() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-  chunks = [];
-  mediaRecorder.ondataavailable = (e) => {
-    if (e.data.size > 0) chunks.push(e.data);
-  };
-  mediaRecorder.onstop = async () => {
-    stream.getTracks().forEach((t) => t.stop());
-    const blob = new Blob(chunks, { type: 'audio/webm' });
-    await uploadBlob(blob);
-  };
-  mediaRecorder.start();
-  recording.value = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    chunks = [];
+    recordStart = Date.now();
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    mediaRecorder.onstop = async () => {
+      stream?.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      const durationMs = Date.now() - recordStart;
+      await uploadBlob(blob, durationMs);
+    };
+    mediaRecorder.start();
+    state.value = 'recording';
+  } catch {
+    ElMessage.error('Microphone access denied');
+  }
+}
+
+function pauseRecording() {
+  mediaRecorder?.pause();
+  state.value = 'paused';
+}
+
+function resumeRecording() {
+  mediaRecorder?.resume();
+  state.value = 'recording';
 }
 
 function stopRecording() {
   mediaRecorder?.stop();
-  recording.value = false;
+  state.value = 'idle';
 }
 
-async function uploadBlob(blob: Blob) {
+async function uploadBlob(blob: Blob, durationMs: number) {
   uploading.value = true;
   try {
     const filename = `recording-${Date.now()}.webm`;
-    const { data: presign } = await http.post<{ id: string; uploadUrl: string }>('/media/presign', {
+    const { data: presign } = await http.post<{ uploadUrl: string; objectKey: string }>('/media/presign', {
       filename,
-      mimeType: 'audio/webm',
+      contentType: 'audio/webm',
     });
 
     await fetch(presign.uploadUrl, {
@@ -113,11 +139,17 @@ async function uploadBlob(blob: Blob) {
       headers: { 'Content-Type': 'audio/webm' },
     });
 
-    await http.post(`/media/${presign.id}/complete`, {
-      bytes: blob.size,
+    await http.post('/media/complete', {
+      objectKey: presign.objectKey,
+      sizeBytes: blob.size,
+      mimeType: 'audio/webm',
+      durationMs,
     });
 
+    ElMessage.success('Recording uploaded');
     await loadRecordings();
+  } catch {
+    ElMessage.error('Upload failed, please retry');
   } finally {
     uploading.value = false;
   }
@@ -126,5 +158,11 @@ async function uploadBlob(blob: Blob) {
 async function play(id: string) {
   const { data } = await http.get<{ playUrl: string }>(`/media/${id}`);
   playUrl.value = data.playUrl;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 </script>

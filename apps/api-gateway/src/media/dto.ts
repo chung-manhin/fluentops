@@ -1,20 +1,29 @@
-import { IsString, IsOptional, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsIn } from 'class-validator';
+
+const ALLOWED_CONTENT_TYPES = ['audio/webm', 'audio/wav', 'audio/mpeg'];
 
 export class PresignDto {
   @IsString()
   filename: string;
 
   @IsString()
-  @IsOptional()
-  mimeType?: string;
+  @IsIn(ALLOWED_CONTENT_TYPES)
+  contentType: string;
 }
 
 export class CompleteUploadDto {
-  @IsInt()
-  @IsOptional()
-  bytes?: number;
+  @IsString()
+  objectKey: string;
 
   @IsInt()
   @IsOptional()
   durationMs?: number;
+
+  @IsString()
+  @IsOptional()
+  mimeType?: string;
+
+  @IsInt()
+  @IsOptional()
+  sizeBytes?: number;
 }

@@ -136,6 +136,58 @@ The web app implements seamless token refresh:
 - Token rotation on refresh (old token revoked)
 - Logout revokes refresh token
 
+## Recording Module
+
+Audio recording pipeline: WebRTC MediaRecorder → presigned MinIO upload → Postgres metadata → list/playback.
+
+### Endpoints (all require Bearer token)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/media/presign` | Get presigned upload URL |
+| POST | `/media/complete` | Confirm upload, write metadata to DB |
+| GET | `/media` | List current user's recordings |
+| GET | `/media/:id` | Recording detail with signed play URL |
+
+### curl Examples
+
+```bash
+TOKEN="<accessToken>"
+
+# Presign upload
+curl -X POST http://localhost:3000/media/presign \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"test.webm","contentType":"audio/webm"}'
+# Returns: {"uploadUrl":"...","objectKey":"...","fileUrl":"..."}
+
+# Upload file to presigned URL
+curl -X PUT "<uploadUrl>" \
+  -H "Content-Type: audio/webm" \
+  --data-binary @test.webm
+
+# Complete upload
+curl -X POST http://localhost:3000/media/complete \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"objectKey":"<objectKey>","sizeBytes":12345,"mimeType":"audio/webm","durationMs":5000}'
+# Returns: {"id":"...","url":"...","createdAt":"..."}
+
+# List recordings
+curl http://localhost:3000/media \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get recording detail (with signed play URL)
+curl http://localhost:3000/media/<id> \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Security
+
+- contentType whitelist: `audio/webm`, `audio/wav`, `audio/mpeg`
+- objectKey prefixed with userId for isolation
+- Users can only access their own recordings
+
 ## Commands
 
 ```bash
@@ -162,6 +214,12 @@ See `.env.example` for all required variables:
 | `REFRESH_SECRET` | Secret for refresh tokens |
 | `ACCESS_TOKEN_TTL` | Access token TTL (e.g., `15m`) |
 | `REFRESH_TOKEN_TTL` | Refresh token TTL (e.g., `7d`) |
+| `MINIO_ENDPOINT` | MinIO host (e.g., `localhost`) |
+| `MINIO_PORT` | MinIO API port (e.g., `9000`) |
+| `MINIO_ACCESS_KEY` | MinIO access key |
+| `MINIO_SECRET_KEY` | MinIO secret key |
+| `MINIO_BUCKET` | MinIO bucket name |
+| `MINIO_PUBLIC_URL` | Public URL for file access (optional) |
 
 ## FAQ
 

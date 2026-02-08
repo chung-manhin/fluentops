@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsString, validateSync } from 'class-validator';
+import { IsString, IsOptional, validateSync } from 'class-validator';
 
 class EnvVars {
   @IsString()
@@ -31,6 +31,10 @@ class EnvVars {
 
   @IsString()
   MINIO_BUCKET: string = 'fluentops';
+
+  @IsString()
+  @IsOptional()
+  MINIO_PUBLIC_URL?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

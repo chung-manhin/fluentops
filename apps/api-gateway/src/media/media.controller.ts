@@ -25,10 +25,10 @@ export class MediaController {
     return this.mediaService.presign((req.user as { id: string }).id, dto);
   }
 
-  @Post(':id/complete')
+  @Post('complete')
   @HttpCode(HttpStatus.OK)
-  complete(@Req() req: Request, @Param('id') id: string, @Body() dto: CompleteUploadDto) {
-    return this.mediaService.completeUpload((req.user as { id: string }).id, id, dto);
+  complete(@Req() req: Request, @Body() dto: CompleteUploadDto) {
+    return this.mediaService.complete((req.user as { id: string }).id, dto);
   }
 
   @Get()
