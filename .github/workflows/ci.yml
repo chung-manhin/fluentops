@@ -77,8 +77,8 @@ jobs:
       - name: Build shared
         run: pnpm --filter @fluentops/shared build
 
-      - name: Push DB Schema
-        run: pnpm --filter api-gateway prisma db push
+      - name: Setup DB
+        run: pnpm --filter api-gateway prisma generate && pnpm --filter api-gateway prisma db push
         env:
           DATABASE_URL: postgresql://fluentops:fluentops@localhost:5432/fluentops_test
 
