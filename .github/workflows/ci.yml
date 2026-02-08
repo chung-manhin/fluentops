@@ -78,12 +78,14 @@ jobs:
         run: pnpm --filter @fluentops/shared build
 
       - name: Setup DB
-        run: pnpm --filter api-gateway prisma generate && pnpm --filter api-gateway prisma db push
+        working-directory: apps/api-gateway
+        run: npx prisma generate && npx prisma db push --skip-generate
         env:
           DATABASE_URL: postgresql://fluentops:fluentops@localhost:5432/fluentops_test
 
       - name: Run E2E Tests
-        run: pnpm --filter api-gateway test:e2e
+        working-directory: apps/api-gateway
+        run: npx jest --config ./test/jest-e2e.json
         env:
           DATABASE_URL: postgresql://fluentops:fluentops@localhost:5432/fluentops_test
           JWT_SECRET: test-jwt-secret
