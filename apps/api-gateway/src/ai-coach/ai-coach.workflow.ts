@@ -17,24 +17,27 @@ interface LLM {
   invoke(messages: Array<{ role: string; content: string }>): Promise<{ content: string }>;
 }
 
-// Mock LLM that returns deterministic results
-class MockLLM implements LLM {
-  private callCount = 0;
-  async invoke(): Promise<{ content: string }> {
-    this.callCount++;
-    switch (this.callCount) {
-      case 1: // diagnose
-        return { content: JSON.stringify(['Used "go" instead of "went" (past tense)', 'Used "buyed" instead of "bought" (irregular verb)']) };
-      case 2: // rewrite
-        return { content: JSON.stringify(['I went to school yesterday and bought a book.', 'Yesterday I went to school and purchased a book.']) };
-      case 3: // drills
-        return { content: JSON.stringify(['Fill in: I ___ (go) to the store yesterday.', 'Correct: She buyed a new dress.', 'Choose: He (went/go/goes) home early.']) };
-      case 4: // score
-        return { content: JSON.stringify({ rubric: { grammar: 40, vocab: 60, fluency: 50, clarity: 65, naturalness: 45 }, feedback: '**Assessment Summary**\n\nThe text contains basic past tense errors. Focus on irregular verb forms.' }) };
-      default:
-        return { content: '[]' };
-    }
-  }
+// Deterministic mock result — no LangGraph, no LLM
+const MOCK_RESULT = {
+  issues: ['Used "go" instead of "went" (past tense)', 'Used "buyed" instead of "bought" (irregular verb)'],
+  rewrites: ['I went to school yesterday and bought a book.', 'Yesterday I went to school and purchased a book.'],
+  drills: ['Fill in: I ___ (go) to the store yesterday.', 'Correct: She buyed a new dress.', 'Choose: He (went/go/goes) home early.'],
+  rubric: { grammar: 40, vocab: 60, fluency: 50, clarity: 65, naturalness: 45 },
+  feedback: '**Assessment Summary**\n\nThe text contains basic past tense errors. Focus on irregular verb forms.',
+};
+
+export async function runMockWorkflow(
+  writeProgress: (stage: string, pct: number) => Promise<void>,
+) {
+  await writeProgress('diagnose', 5);
+  await writeProgress('diagnose', 25);
+  await writeProgress('rewrite', 30);
+  await writeProgress('rewrite', 50);
+  await writeProgress('drills', 55);
+  await writeProgress('drills', 75);
+  await writeProgress('score', 80);
+  await writeProgress('score', 95);
+  return MOCK_RESULT;
 }
 
 async function diagnose(state: CoachStateType, llm: LLM): Promise<Partial<CoachStateType>> {
@@ -99,9 +102,6 @@ export function buildGraph(llm: LLM, callbacks?: NodeCallback) {
   return graph.compile();
 }
 
-export function createLLM(provider: string, apiKey: string, model: string, temperature: number): LLM {
-  if (provider === 'mock' || !apiKey) {
-    return new MockLLM();
-  }
+export function createLLM(apiKey: string, model: string, temperature: number): LLM {
   return new ChatOpenAI({ openAIApiKey: apiKey, modelName: model, temperature }) as unknown as LLM;
 }

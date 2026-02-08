@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Observable, interval, from, EMPTY } from 'rxjs';
 import { switchMap, concatMap, tap, map, takeWhile } from 'rxjs/operators';
 import { PrismaService } from '../prisma';
-import { buildGraph, createLLM } from './ai-coach.workflow';
+import { buildGraph, createLLM, runMockWorkflow } from './ai-coach.workflow';
 import { AssessDto } from './dto';
 
 const STAGE_PCT: Record<string, [number, number]> = {
@@ -42,34 +42,41 @@ export class AICoachService {
 
     await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'RUNNING' } });
 
-    const model = this.config.get<string>('MODEL_NAME') || 'gpt-4o-mini';
-    const temperature = parseFloat(this.config.get<string>('AI_TEMPERATURE') || '0.7');
-
     try {
       let seq = 0;
-      const llm = createLLM(isMock ? 'mock' : 'openai', apiKey, model, temperature);
-
-      const callbacks = {
-        beforeNode: async (name: string) => {
-          const pct = STAGE_PCT[name]?.[0] ?? 0;
-          await this.writeEvent(assessmentId, seq++, 'PROGRESS', { stage: name, pct });
-        },
-        afterNode: async (name: string) => {
-          const pct = STAGE_PCT[name]?.[1] ?? 0;
-          await this.writeEvent(assessmentId, seq++, 'PROGRESS', { stage: name, pct });
-        },
+      const writeProgress = async (stage: string, pct: number) => {
+        await this.writeEvent(assessmentId, seq++, 'PROGRESS', { stage, pct });
       };
 
-      const graph = buildGraph(llm, callbacks);
-      const result = await graph.invoke({
-        text: dto.text || '',
-        goals: dto.goals || [],
-        issues: [],
-        rewrites: [],
-        drills: [],
-        rubric: {},
-        feedback: '',
-      });
+      let result: { issues: string[]; rewrites: string[]; drills: string[]; rubric: Record<string, number>; feedback: string };
+
+      if (isMock) {
+        result = await runMockWorkflow(writeProgress);
+      } else {
+        const model = this.config.get<string>('MODEL_NAME') || 'gpt-4o-mini';
+        const temperature = parseFloat(this.config.get<string>('AI_TEMPERATURE') || '0.7');
+        const llm = createLLM(apiKey, model, temperature);
+
+        const callbacks = {
+          beforeNode: async (name: string) => {
+            await writeProgress(name, STAGE_PCT[name]?.[0] ?? 0);
+          },
+          afterNode: async (name: string) => {
+            await writeProgress(name, STAGE_PCT[name]?.[1] ?? 0);
+          },
+        };
+
+        const graph = buildGraph(llm, callbacks);
+        result = await graph.invoke({
+          text: dto.text || '',
+          goals: dto.goals || [],
+          issues: [],
+          rewrites: [],
+          drills: [],
+          rubric: {},
+          feedback: '',
+        });
+      }
 
       await this.writeEvent(assessmentId, seq++, 'FINAL', {
         rubric: result.rubric,
