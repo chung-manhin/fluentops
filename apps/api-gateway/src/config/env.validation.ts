@@ -52,6 +52,26 @@ class EnvVars {
 
   @IsString()
   BILLING_PROVIDER: string = 'mock';
+
+  @IsString()
+  @IsOptional()
+  ALIPAY_APP_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  ALIPAY_PRIVATE_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  ALIPAY_PUBLIC_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  ALIPAY_GATEWAY?: string;
+
+  @IsString()
+  @IsOptional()
+  ALIPAY_NOTIFY_URL?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

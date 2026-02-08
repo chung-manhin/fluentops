@@ -1,12 +1,15 @@
-import { Injectable, OnModuleInit, BadRequestException } from '@nestjs/common';
+import { Injectable, OnModuleInit, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
+import { AlipayService } from './alipay.service';
 
 @Injectable()
 export class BillingService implements OnModuleInit {
+  private readonly logger = new Logger(BillingService.name);
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private alipayService: AlipayService,
   ) {}
 
   async onModuleInit() {
@@ -26,10 +29,10 @@ export class BillingService implements OnModuleInit {
     return { credits: row?.credits ?? 0 };
   }
 
-  async createOrder(userId: string, planId: string) {
+  async createOrder(userId: string, planId: string, notifyUrl?: string) {
     const plan = await this.prisma.plan.findUniqueOrThrow({ where: { id: planId } });
     const provider = this.config.get<string>('BILLING_PROVIDER') || 'mock';
-    return this.prisma.order.create({
+    const order = await this.prisma.order.create({
       data: {
         userId,
         planId,
@@ -37,6 +40,19 @@ export class BillingService implements OnModuleInit {
         provider: provider.toUpperCase() as 'MOCK' | 'ALIPAY',
       },
     });
+
+    if (provider === 'alipay' && this.alipayService.isEnabled()) {
+      const totalAmount = (plan.priceCents / 100).toFixed(2);
+      const payUrl = await this.alipayService.createPagePayUrl(
+        order.id,
+        plan.name,
+        totalAmount,
+        notifyUrl || '',
+      );
+      return { ...order, payUrl };
+    }
+
+    return order;
   }
 
   async mockPay(orderId: string, userId: string) {
@@ -47,13 +63,16 @@ export class BillingService implements OnModuleInit {
     return this.fulfillOrder(orderId);
   }
 
-  async fulfillOrder(orderId: string) {
+  async fulfillOrder(orderId: string, providerTradeNo?: string) {
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { plan: true } });
     if (order.status === 'PAID') return order;
 
     const credits = order.plan.credits ?? 0;
     const [updated] = await this.prisma.$transaction([
-      this.prisma.order.update({ where: { id: orderId }, data: { status: 'PAID', paidAt: new Date() } }),
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'PAID', paidAt: new Date(), providerTradeNo: providerTradeNo ?? null },
+      }),
       this.prisma.userBalance.upsert({
         where: { userId: order.userId },
         create: { userId: order.userId, credits },
@@ -64,6 +83,30 @@ export class BillingService implements OnModuleInit {
       }),
     ]);
     return updated;
+  }
+
+  async handleAlipayNotify(params: Record<string, string>): Promise<string> {
+    if (!this.alipayService.checkNotifySign(params)) {
+      this.logger.warn('Alipay notify signature verification failed');
+      return 'fail';
+    }
+
+    const orderId = params.out_trade_no;
+    const tradeStatus = params.trade_status;
+    if (tradeStatus !== 'TRADE_SUCCESS' && tradeStatus !== 'TRADE_FINISHED') return 'success';
+
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) { this.logger.warn(`Alipay notify: order ${orderId} not found`); return 'fail'; }
+    if (order.status === 'PAID') return 'success'; // idempotent
+
+    const expectedAmount = (order.amountCents / 100).toFixed(2);
+    if (params.total_amount !== expectedAmount) {
+      this.logger.warn(`Alipay notify: amount mismatch ${params.total_amount} vs ${expectedAmount}`);
+      return 'fail';
+    }
+
+    await this.fulfillOrder(orderId, params.trade_no);
+    return 'success';
   }
 
   async hasCredits(userId: string) {

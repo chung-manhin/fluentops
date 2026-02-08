@@ -274,8 +274,9 @@ Credit-based billing: users buy credit packs (mock payment for CI/dev, Alipay sa
 |--------|------|-------------|
 | GET | `/billing/plans` | List available credit packs |
 | GET | `/billing/balance` | Get current credit balance |
-| POST | `/billing/order` | Create a purchase order |
+| POST | `/billing/order` | Create a purchase order (returns `payUrl` when alipay) |
 | POST | `/billing/mock/pay` | Pay order via mock provider (dev/CI only) |
+| POST | `/billing/alipay/notify` | Alipay async notification callback (no auth) |
 
 ### curl Examples
 
@@ -308,6 +309,43 @@ curl -X POST http://localhost:3000/billing/mock/pay \
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `BILLING_PROVIDER` | No | `mock` | Payment provider (`mock` or `alipay`) |
+| `ALIPAY_APP_ID` | When alipay | — | Alipay sandbox app ID |
+| `ALIPAY_PRIVATE_KEY` | When alipay | — | App private key (RSA2) |
+| `ALIPAY_PUBLIC_KEY` | When alipay | — | Alipay public key |
+| `ALIPAY_GATEWAY` | No | sandbox URL | Alipay gateway endpoint |
+| `ALIPAY_NOTIFY_URL` | When alipay | — | Public URL for async notifications |
+
+### Mock vs Alipay
+
+| | Mock | Alipay Sandbox |
+|---|---|---|
+| Default | Yes | No |
+| CI safe | Yes | No (needs network) |
+| How it works | `POST /billing/mock/pay` instantly fulfills | `POST /billing/order` returns `payUrl`, user pays on Alipay, notify callback fulfills |
+| Env | `BILLING_PROVIDER=mock` | `BILLING_PROVIDER=alipay` + `ALIPAY_*` vars |
+
+### Alipay Sandbox Testing (local, one-time)
+
+1. Register at [Alipay Open Platform Sandbox](https://open.alipay.com/develop/sandbox/app)
+2. Get sandbox `APPID`, generate RSA2 key pair, set app public key in sandbox console
+3. Configure `.env`:
+   ```
+   BILLING_PROVIDER=alipay
+   ALIPAY_APP_ID=<sandbox-app-id>
+   ALIPAY_PRIVATE_KEY=<your-private-key>
+   ALIPAY_PUBLIC_KEY=<alipay-public-key>
+   ALIPAY_GATEWAY=https://openapi-sandbox.dl.alipaydev.com/gateway.do
+   ALIPAY_NOTIFY_URL=https://<your-ngrok-or-tunnel>/billing/alipay/notify
+   ```
+4. Expose local API via ngrok: `ngrok http 3000`
+5. Start the API: `corepack pnpm dev`
+6. Create order → open `payUrl` in browser → pay with sandbox account
+7. Alipay sends notify to your tunnel → credits added automatically
+8. Common gotchas:
+   - Notify URL must be publicly accessible (use ngrok/cloudflare tunnel)
+   - Sandbox keys are different from production keys
+   - RSA2 (SHA256WithRSA) is required, not RSA1
+   - `checkNotifySign` verifies the callback is authentic
 
 ## Commands
 

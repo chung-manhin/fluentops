@@ -33,6 +33,7 @@ import { ElMessage } from 'element-plus';
 import { http } from '../lib/http';
 
 interface Plan { id: string; name: string; priceCents: number }
+interface OrderResult { id: string; payUrl?: string }
 
 const plans = ref<Plan[]>([]);
 const balance = ref(0);
@@ -50,7 +51,11 @@ async function load() {
 async function buy(planId: string) {
   buying.value = planId;
   try {
-    const { data: order } = await http.post<{ id: string }>('/billing/order', { planId });
+    const { data: order } = await http.post<OrderResult>('/billing/order', { planId });
+    if (order.payUrl) {
+      window.location.href = order.payUrl;
+      return;
+    }
     await http.post('/billing/mock/pay', { orderId: order.id });
     ElMessage.success('Purchase successful!');
     await load();
