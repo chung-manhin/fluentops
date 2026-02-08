@@ -14,7 +14,8 @@ Planned capabilities include:
 - Monorepo: pnpm workspace + Turborepo
 - Node.js: 20
 - Web: Vue 3 + TypeScript + Vite + Pinia + Vue Router + Axios + Element Plus + TailwindCSS + GSAP
-- API Gateway: NestJS + Jest
+- API Gateway: NestJS + Prisma + JWT + Jest
+- Database: PostgreSQL
 - Shared: TypeScript `tsc` build (outputs `dist` + `d.ts`)
 - Infra: Docker Compose (Postgres + Redis + MinIO)
 
@@ -22,17 +23,17 @@ Planned capabilities include:
 
 ```
 apps/
-  web/
-  api-gateway/
+  web/                  # Vue3 frontend
+  api-gateway/          # NestJS backend with auth
 packages/
-  shared/
+  shared/               # Shared types/utils
 services/
-  auth/
-  ai-coach/
-  media/
-  realtime/
-  billing/
-  worker/
+  auth/                 # (placeholder)
+  ai-coach/             # (placeholder)
+  media/                # (placeholder)
+  realtime/             # (placeholder)
+  billing/              # (placeholder)
+  worker/               # (placeholder)
 infra/
   docker-compose.yml
 .github/
@@ -48,36 +49,131 @@ corepack prepare pnpm@9.15.4 --activate
 corepack pnpm install
 ```
 
-### 2) Start infra (optional)
+### 2) Start infra
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
 ```
 
-### 3) Run dev
+### 3) Setup environment
+
+```bash
+cp .env.example .env
+# Edit .env with your secrets
+```
+
+### 4) Setup database
+
+```bash
+cd apps/api-gateway
+corepack pnpm prisma migrate dev
+```
+
+### 5) Run dev
 
 ```bash
 corepack pnpm dev
 ```
 
-- Web: Vite dev server (URL printed in terminal)
-- API: `curl http://localhost:3000/health` -> `{ "ok": true }`
+- Web: http://localhost:5173
+- API: http://localhost:3000
+
+## Auth Module
+
+The API Gateway includes a complete authentication system with dual-token (access + refresh) flow.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/auth/register` | Register new user |
+| POST | `/auth/login` | Login, returns tokens |
+| POST | `/auth/refresh` | Refresh tokens (rotation) |
+| POST | `/auth/logout` | Revoke refresh token |
+| GET | `/me` | Get current user (requires Bearer token) |
+
+### curl Examples
+
+```bash
+# Register
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+
+# Login
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+# Returns: {"accessToken":"...","refreshToken":"..."}
+
+# Get current user
+curl http://localhost:3000/me \
+  -H "Authorization: Bearer <accessToken>"
+
+# Refresh tokens
+curl -X POST http://localhost:3000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"<refreshToken>"}'
+
+# Logout
+curl -X POST http://localhost:3000/auth/logout \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"<refreshToken>"}'
+```
+
+### Frontend Auth Flow
+
+The web app implements seamless token refresh:
+- Access token attached to all requests via Axios interceptor
+- On 401, automatically refreshes tokens and retries request
+- Concurrent requests queue during refresh (single refresh call)
+- On refresh failure, redirects to login
+
+### Security Features
+
+- Passwords hashed with bcrypt
+- Refresh tokens stored as SHA-256 hash in database
+- Token rotation on refresh (old token revoked)
+- Logout revokes refresh token
 
 ## Commands
 
 ```bash
-corepack pnpm lint
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm build
+corepack pnpm lint       # ESLint
+corepack pnpm typecheck  # TypeScript check
+corepack pnpm test       # Unit tests
+corepack pnpm build      # Production build
+
+# API Gateway specific
+cd apps/api-gateway
+corepack pnpm prisma migrate dev   # Run migrations
+corepack pnpm prisma studio        # Open Prisma Studio
+corepack pnpm test:e2e             # E2E tests (requires DB)
 ```
+
+## Environment Variables
+
+See `.env.example` for all required variables:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Secret for access tokens |
+| `REFRESH_SECRET` | Secret for refresh tokens |
+| `ACCESS_TOKEN_TTL` | Access token TTL (e.g., `15m`) |
+| `REFRESH_TOKEN_TTL` | Refresh token TTL (e.g., `7d`) |
 
 ## FAQ
 
-- Ports:
+- **Ports:**
   - Postgres: 5432
   - Redis: 6379
   - MinIO: 9000 (API) / 9001 (Console)
   - API Gateway: 3000
-- Env:
-  - See `.env.example` (aligned with `infra/docker-compose.yml`).
+  - Web Dev Server: 5173
+
+- **Missing env vars:** API will fail to start with clear error message listing missing variables.
+
+- **Node version:** Requires Node 20. Use `nvm use 20` or similar.
+
+- **pnpm not found:** Run `corepack prepare pnpm@9.15.4 --activate` first.

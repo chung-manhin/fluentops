@@ -37,3 +37,56 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fluentops_test
+          POSTGRES_USER: fluentops
+          POSTGRES_PASSWORD: fluentops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter api-gateway prisma generate
+
+      - name: Push DB Schema
+        run: pnpm --filter api-gateway prisma db push
+        env:
+          DATABASE_URL: postgresql://fluentops:fluentops@localhost:5432/fluentops_test
+
+      - name: Run E2E Tests
+        run: pnpm --filter api-gateway test:e2e
+        env:
+          DATABASE_URL: postgresql://fluentops:fluentops@localhost:5432/fluentops_test
+          JWT_SECRET: test-jwt-secret
+          REFRESH_SECRET: test-refresh-secret
+          ACCESS_TOKEN_TTL: 15m
+          REFRESH_TOKEN_TTL: 7d
