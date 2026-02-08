@@ -22,22 +22,22 @@ export class MediaController {
   @Post('presign')
   @HttpCode(HttpStatus.OK)
   presign(@Req() req: Request, @Body() dto: PresignDto) {
-    return this.mediaService.presign((req.user as { sub: string }).sub, dto);
+    return this.mediaService.presign((req.user as { id: string }).id, dto);
   }
 
   @Post(':id/complete')
   @HttpCode(HttpStatus.OK)
   complete(@Req() req: Request, @Param('id') id: string, @Body() dto: CompleteUploadDto) {
-    return this.mediaService.completeUpload((req.user as { sub: string }).sub, id, dto);
+    return this.mediaService.completeUpload((req.user as { id: string }).id, id, dto);
   }
 
   @Get()
   list(@Req() req: Request) {
-    return this.mediaService.list((req.user as { sub: string }).sub);
+    return this.mediaService.list((req.user as { id: string }).id);
   }
 
   @Get(':id')
   detail(@Req() req: Request, @Param('id') id: string) {
-    return this.mediaService.detail((req.user as { sub: string }).sub, id);
+    return this.mediaService.detail((req.user as { id: string }).id, id);
   }
 }
