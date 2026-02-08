@@ -1,4 +1,4 @@
-import { Injectable, MessageEvent } from '@nestjs/common';
+import { Injectable, Logger, MessageEvent } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Observable, interval, from, EMPTY } from 'rxjs';
 import { switchMap, concatMap, tap, map, takeWhile } from 'rxjs/operators';
@@ -15,6 +15,8 @@ const STAGE_PCT: Record<string, [number, number]> = {
 
 @Injectable()
 export class AICoachService {
+  private readonly logger = new Logger(AICoachService.name);
+
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
@@ -30,7 +32,9 @@ export class AICoachService {
       },
     });
 
-    this.runWorkflow(assessment.id, dto).catch(() => {});
+    this.runWorkflow(assessment.id, dto).catch((err) =>
+      this.logger.error(`Workflow failed for assessment ${assessment.id}`, err?.stack ?? err),
+    );
 
     return { assessmentId: assessment.id, traceId: assessment.traceId };
   }
@@ -148,6 +152,7 @@ export class AICoachService {
           this.prisma.assessmentEvent.findMany({
             where: { assessmentId, seq: { gt: lastSeq } },
             orderBy: { seq: 'asc' },
+            take: 50,
           }),
         ),
       ),

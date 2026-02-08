@@ -256,23 +256,31 @@ describe('App (e2e)', () => {
     });
 
     it('GET /ai/assess/:id returns succeeded with rubric structure', async () => {
-      // wait for async mock workflow to complete
-      await new Promise((r) => setTimeout(r, 3000));
+      // poll until SUCCEEDED or timeout 5s
+      let status = '';
+      let body: Record<string, unknown> = {};
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        const res = await request(app.getHttpServer())
+          .get(`/ai/assess/${assessmentId}`)
+          .set('Authorization', `Bearer ${tokenA}`)
+          .expect(200);
+        body = res.body;
+        status = res.body.status;
+        if (status === 'SUCCEEDED' || status === 'FAILED') break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
 
-      const res = await request(app.getHttpServer())
-        .get(`/ai/assess/${assessmentId}`)
-        .set('Authorization', `Bearer ${tokenA}`)
-        .expect(200);
-
-      expect(res.body.status).toBe('SUCCEEDED');
-      expect(res.body.rubricJson).toBeDefined();
-      expect(res.body.rubricJson).toHaveProperty('grammar');
-      expect(res.body.rubricJson).toHaveProperty('vocab');
-      expect(res.body.rubricJson).toHaveProperty('fluency');
-      expect(res.body.rubricJson).toHaveProperty('clarity');
-      expect(res.body.rubricJson).toHaveProperty('naturalness');
-      expect(res.body.feedbackMarkdown).toBeDefined();
-      expect(typeof res.body.feedbackMarkdown).toBe('string');
+      expect(status).toBe('SUCCEEDED');
+      const rubric = body.rubricJson as Record<string, number>;
+      expect(rubric).toBeDefined();
+      expect(typeof rubric.grammar).toBe('number');
+      expect(typeof rubric.vocab).toBe('number');
+      expect(typeof rubric.fluency).toBe('number');
+      expect(typeof rubric.clarity).toBe('number');
+      expect(typeof rubric.naturalness).toBe('number');
+      expect(body.feedbackMarkdown).toBeDefined();
+      expect(typeof body.feedbackMarkdown).toBe('string');
     });
 
     it('GET /ai/assessments lists recent assessments', async () => {
