@@ -20,6 +20,9 @@
   },
   "dependencies": {
     "@fluentops/shared": "workspace:^",
+    "@langchain/core": "^1.1.19",
+    "@langchain/langgraph": "^1.1.4",
+    "@langchain/openai": "^1.2.5",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^10.0.0",

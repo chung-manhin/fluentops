@@ -188,6 +188,47 @@ curl http://localhost:3000/media/<id> \
 - objectKey prefixed with userId for isolation
 - Users can only access their own recordings
 
+## AI Coach Module
+
+AI-powered English assessment: LangGraph 4-step workflow (diagnose → rewrite → drills → score) with SSE streaming.
+
+### Endpoints (all require Bearer token)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/ai/assess` | Start assessment (returns assessmentId + SSE URL) |
+| GET | `/ai/assess/:id` | Get assessment result |
+| GET | `/ai/assess/:id/stream` | SSE stream of progress/token/final events |
+
+### curl Examples
+
+```bash
+TOKEN="<accessToken>"
+
+# Start assessment
+curl -X POST http://localhost:3000/ai/assess \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"inputType":"text","text":"I go to school yesterday and buyed a book"}'
+# Returns: {"assessmentId":"...","traceId":"...","sseUrl":"/ai/assess/.../stream"}
+
+# Get result
+curl http://localhost:3000/ai/assess/<assessmentId> \
+  -H "Authorization: Bearer $TOKEN"
+
+# SSE stream
+curl -N http://localhost:3000/ai/assess/<assessmentId>/stream \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | No | — | OpenAI API key (assessment fails gracefully without it) |
+| `MODEL_NAME` | No | `gpt-4o-mini` | OpenAI model name |
+| `AI_TEMPERATURE` | No | `0.7` | LLM temperature |
+
 ## Commands
 
 ```bash

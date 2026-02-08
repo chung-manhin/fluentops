@@ -35,6 +35,16 @@ class EnvVars {
   @IsString()
   @IsOptional()
   MINIO_PUBLIC_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  OPENAI_API_KEY?: string;
+
+  @IsString()
+  MODEL_NAME: string = 'gpt-4o-mini';
+
+  @IsString()
+  AI_TEMPERATURE: string = '0.7';
 }
 
 export function validate(config: Record<string, unknown>) {

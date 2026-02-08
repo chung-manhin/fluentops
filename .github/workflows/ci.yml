@@ -97,3 +97,6 @@ jobs:
           MINIO_ACCESS_KEY: minio
           MINIO_SECRET_KEY: minio123456
           MINIO_BUCKET: fluentops-test
+          OPENAI_API_KEY: ""
+          MODEL_NAME: gpt-4o-mini
+          AI_TEMPERATURE: "0.7"

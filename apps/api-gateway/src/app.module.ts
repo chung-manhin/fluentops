@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma';
 import { AuthModule } from './auth';
 import { UserModule } from './user/user.module';
 import { MediaModule } from './media';
+import { AICoachModule } from './ai-coach';
 import { validate } from './config/env.validation';
 
 @Module({
@@ -17,6 +18,7 @@ import { validate } from './config/env.validation';
     AuthModule,
     UserModule,
     MediaModule,
+    AICoachModule,
   ],
   controllers: [AppController],
 })

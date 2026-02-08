@@ -4,6 +4,7 @@ import LoginPage from '../pages/LoginPage.vue';
 import RegisterPage from '../pages/RegisterPage.vue';
 import DashboardPage from '../pages/DashboardPage.vue';
 import SpeakingPage from '../pages/SpeakingPage.vue';
+import CoachPage from '../pages/CoachPage.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -13,6 +14,7 @@ export const router = createRouter({
     { path: '/register', name: 'register', component: RegisterPage },
     { path: '/dashboard', name: 'dashboard', component: DashboardPage, meta: { requiresAuth: true } },
     { path: '/speaking', name: 'speaking', component: SpeakingPage, meta: { requiresAuth: true } },
+    { path: '/coach', name: 'coach', component: CoachPage, meta: { requiresAuth: true } },
   ],
 });
 

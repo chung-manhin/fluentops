@@ -5,6 +5,7 @@
         <h1 class="text-lg font-semibold">FluentOps Dashboard</h1>
         <div class="flex gap-2">
           <el-button @click="$router.push('/speaking')">Speaking</el-button>
+          <el-button @click="$router.push('/coach')">AI Coach</el-button>
           <el-button @click="handleLogout" :loading="loggingOut">Logout</el-button>
         </div>
       </div>

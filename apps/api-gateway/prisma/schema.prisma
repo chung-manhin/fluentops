@@ -14,6 +14,7 @@ model User {
   createdAt    DateTime       @default(now())
   refreshTokens RefreshToken[]
   recordings    Recording[]
+  assessments   Assessment[]
 }
 
 model RefreshToken {
@@ -47,4 +48,51 @@ model Recording {
 enum RecordingStatus {
   PENDING
   UPLOADED
+}
+
+model Assessment {
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traceId          String            @unique @default(cuid())
+  inputType        AssessmentInput
+  inputText        String?
+  recordingId      String?
+  status           AssessmentStatus  @default(QUEUED)
+  rubricJson       Json?
+  feedbackMarkdown String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  events           AssessmentEvent[]
+  @@index([userId])
+}
+
+model AssessmentEvent {
+  id           String              @id @default(cuid())
+  assessmentId String
+  assessment   Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  seq          Int
+  type         AssessmentEventType
+  payloadJson  Json
+  createdAt    DateTime            @default(now())
+  @@index([assessmentId])
+}
+
+enum AssessmentInput {
+  TEXT
+  RECORDING
+}
+
+enum AssessmentStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum AssessmentEventType {
+  PROGRESS
+  TOKEN
+  FINAL
+  ERROR
 }
