@@ -243,6 +243,14 @@ describe('App (e2e)', () => {
         .send(userA)
         .expect(200);
       tokenA = res.body.accessToken;
+
+      // seed credits so AI assess doesn't return 402
+      const user = await prisma.user.findFirstOrThrow({ where: { email: userA.email } });
+      await prisma.userBalance.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, credits: 10 },
+        update: { credits: 10 },
+      });
     });
 
     it('POST /ai/assess (text) returns assessmentId + traceId + sseUrl', async () => {
@@ -318,6 +326,10 @@ describe('App (e2e)', () => {
         .send(userA)
         .expect(200);
       tokenA = res.body.accessToken;
+
+      // reset balance so billing tests start from 0
+      const user = await prisma.user.findFirstOrThrow({ where: { email: userA.email } });
+      await prisma.userBalance.deleteMany({ where: { userId: user.id } });
     });
 
     it('GET /billing/plans returns at least 1 plan', async () => {
