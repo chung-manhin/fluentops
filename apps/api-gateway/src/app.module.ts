@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma';
 import { AuthModule } from './auth';
 import { UserModule } from './user/user.module';
 import { MediaModule } from './media';
+import { BillingModule } from './billing';
 import { AICoachModule } from './ai-coach';
 import { validate } from './config/env.validation';
 
@@ -18,6 +19,7 @@ import { validate } from './config/env.validation';
     AuthModule,
     UserModule,
     MediaModule,
+    BillingModule,
     AICoachModule,
   ],
   controllers: [AppController],

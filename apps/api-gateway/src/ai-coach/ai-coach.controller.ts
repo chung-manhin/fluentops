@@ -9,22 +9,30 @@ import {
   Req,
   Sse,
   NotFoundException,
+  HttpException,
   MessageEvent,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { BillingService } from '../billing';
 import { AICoachService } from './ai-coach.service';
 import { AssessDto } from './dto';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
 export class AICoachController {
-  constructor(private aiCoachService: AICoachService) {}
+  constructor(
+    private aiCoachService: AICoachService,
+    private billingService: BillingService,
+  ) {}
 
   @Post('assess')
   async assess(@Req() req: Request, @Body() dto: AssessDto) {
     const userId = (req.user as { id: string }).id;
+    if (!(await this.billingService.hasCredits(userId))) {
+      throw new HttpException('INSUFFICIENT_CREDITS', 402);
+    }
     const result = await this.aiCoachService.createAssessment(userId, dto);
     return { ...result, sseUrl: `/ai/assess/${result.assessmentId}/stream` };
   }

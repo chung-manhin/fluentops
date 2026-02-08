@@ -6,6 +6,7 @@
         <div class="flex gap-2">
           <el-button @click="$router.push('/speaking')">Speaking</el-button>
           <el-button @click="$router.push('/coach')">AI Coach</el-button>
+          <el-button @click="$router.push('/billing')">Billing</el-button>
           <el-button @click="handleLogout" :loading="loggingOut">Logout</el-button>
         </div>
       </div>

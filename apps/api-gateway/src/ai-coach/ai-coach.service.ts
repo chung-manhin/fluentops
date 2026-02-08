@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Observable, interval, from, EMPTY } from 'rxjs';
 import { switchMap, concatMap, tap, map, takeWhile } from 'rxjs/operators';
 import { PrismaService } from '../prisma';
+import { BillingService } from '../billing';
 import { buildGraph, createLLM, runMockWorkflow } from './ai-coach.workflow';
 import { AssessDto } from './dto';
 
@@ -20,6 +21,7 @@ export class AICoachService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private billingService: BillingService,
   ) {}
 
   async createAssessment(userId: string, dto: AssessDto) {
@@ -32,14 +34,14 @@ export class AICoachService {
       },
     });
 
-    this.runWorkflow(assessment.id, dto).catch((err) =>
+    this.runWorkflow(assessment.id, userId, dto).catch((err) =>
       this.logger.error(`Workflow failed for assessment ${assessment.id}`, err?.stack ?? err),
     );
 
     return { assessmentId: assessment.id, traceId: assessment.traceId };
   }
 
-  async runWorkflow(assessmentId: string, dto: AssessDto) {
+  async runWorkflow(assessmentId: string, userId: string, dto: AssessDto) {
     const provider = this.config.get<string>('AI_PROVIDER') || '';
     const apiKey = this.config.get<string>('OPENAI_API_KEY') || '';
     const isMock = provider === 'mock' || !apiKey;
@@ -94,6 +96,8 @@ export class AICoachService {
         where: { id: assessmentId },
         data: { status: 'SUCCEEDED', rubricJson: result.rubric, feedbackMarkdown: result.feedback },
       });
+
+      await this.billingService.deductCredit(userId, 'ai_assess', assessmentId);
     } catch (err) {
       const count = await this.prisma.assessmentEvent.count({ where: { assessmentId } });
       await this.writeEvent(assessmentId, count, 'ERROR', { message: String(err) });

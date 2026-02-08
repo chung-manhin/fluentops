@@ -49,6 +49,9 @@ class EnvVars {
 
   @IsString()
   AI_TEMPERATURE: string = '0.7';
+
+  @IsString()
+  BILLING_PROVIDER: string = 'mock';
 }
 
 export function validate(config: Record<string, unknown>) {

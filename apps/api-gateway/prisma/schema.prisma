@@ -15,6 +15,9 @@ model User {
   refreshTokens RefreshToken[]
   recordings    Recording[]
   assessments   Assessment[]
+  balance       UserBalance?
+  orders        Order[]
+  ledger        CreditLedger[]
 }
 
 model RefreshToken {
@@ -95,4 +98,65 @@ enum AssessmentEventType {
   TOKEN
   FINAL
   ERROR
+}
+
+enum PlanType {
+  CREDITS
+  SUBSCRIPTION
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum PayProvider {
+  ALIPAY
+  MOCK
+}
+
+model Plan {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  type       PlanType
+  credits    Int?
+  priceCents Int
+  createdAt  DateTime @default(now())
+  orders     Order[]
+}
+
+model UserBalance {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credits   Int       @default(0)
+  expiresAt DateTime?
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId          String
+  plan            Plan        @relation(fields: [planId], references: [id])
+  amountCents     Int
+  status          OrderStatus @default(PENDING)
+  provider        PayProvider
+  providerTradeNo String?
+  createdAt       DateTime    @default(now())
+  paidAt          DateTime?
+  @@index([userId])
+}
+
+model CreditLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Int
+  reason    String
+  refId     String?
+  createdAt DateTime @default(now())
+  @@index([userId])
 }

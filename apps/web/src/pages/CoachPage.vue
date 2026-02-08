@@ -3,7 +3,10 @@
     <header class="border-b bg-white">
       <div class="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
         <h1 class="text-lg font-semibold">AI Coach</h1>
-        <el-button @click="$router.push('/dashboard')">Dashboard</el-button>
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-gray-500">Credits: {{ credits }}</span>
+          <el-button @click="$router.push('/dashboard')">Dashboard</el-button>
+        </div>
       </div>
     </header>
 
@@ -19,9 +22,10 @@
           :disabled="loading"
         />
         <div class="mt-4">
-          <el-button type="primary" @click="submit" :loading="loading" :disabled="!inputText.trim()">
+          <el-button type="primary" @click="submit" :loading="loading" :disabled="!inputText.trim() || credits <= 0">
             Assess
           </el-button>
+          <router-link v-if="credits <= 0" to="/billing" class="text-sm text-blue-500 ml-3">Buy credits</router-link>
         </div>
       </el-card>
 
@@ -123,7 +127,17 @@ const errorMsg = ref('');
 const result = ref<AssessResult | null>(null);
 const history = ref<HistoryItem[]>([]);
 const historyLoading = ref(false);
+const credits = ref(0);
 let lastEventId = -1;
+
+async function loadBalance() {
+  try {
+    const { data } = await http.get<{ credits: number }>('/billing/balance');
+    credits.value = data.credits;
+  } catch {
+    // ignore
+  }
+}
 
 async function loadHistory() {
   historyLoading.value = true;
@@ -137,7 +151,10 @@ async function loadHistory() {
   }
 }
 
-onMounted(loadHistory);
+onMounted(() => {
+  loadHistory();
+  loadBalance();
+});
 
 async function viewAssessment(id: string) {
   try {
@@ -173,6 +190,7 @@ async function submit() {
     streaming.value = true;
     await readSSE(data.assessmentId);
     await loadHistory();
+    await loadBalance();
   } catch {
     errorMsg.value = 'Failed to start assessment';
   } finally {

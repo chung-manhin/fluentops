@@ -101,3 +101,4 @@ jobs:
           AI_PROVIDER: mock
           MODEL_NAME: gpt-4o-mini
           AI_TEMPERATURE: "0.7"
+          BILLING_PROVIDER: mock

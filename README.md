@@ -192,6 +192,8 @@ curl http://localhost:3000/media/<id> \
 
 AI-powered English assessment: LangGraph 4-step workflow (diagnose → rewrite → drills → score) with SSE streaming.
 
+Requires credits — each assessment costs 1 credit. Buy credits via the Billing module first.
+
 When `AI_PROVIDER=mock` or `OPENAI_API_KEY` is empty, the workflow uses a built-in mock LLM that returns deterministic results — safe for CI and local dev without an API key.
 
 ### Endpoints (all require Bearer token)
@@ -261,6 +263,51 @@ data: {"message":"..."}
 | `OPENAI_API_KEY` | No | — | OpenAI API key (mock used if empty) |
 | `MODEL_NAME` | No | `gpt-4o-mini` | OpenAI model name |
 | `AI_TEMPERATURE` | No | `0.7` | LLM temperature |
+
+## Billing Module
+
+Credit-based billing: users buy credit packs (mock payment for CI/dev, Alipay sandbox for production). Each AI assessment costs 1 credit.
+
+### Endpoints (all require Bearer token)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/billing/plans` | List available credit packs |
+| GET | `/billing/balance` | Get current credit balance |
+| POST | `/billing/order` | Create a purchase order |
+| POST | `/billing/mock/pay` | Pay order via mock provider (dev/CI only) |
+
+### curl Examples
+
+```bash
+TOKEN="<accessToken>"
+
+# List plans
+curl http://localhost:3000/billing/plans \
+  -H "Authorization: Bearer $TOKEN"
+
+# Check balance
+curl http://localhost:3000/billing/balance \
+  -H "Authorization: Bearer $TOKEN"
+
+# Create order
+curl -X POST http://localhost:3000/billing/order \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"planId":"<planId>"}'
+
+# Mock pay
+curl -X POST http://localhost:3000/billing/mock/pay \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"orderId":"<orderId>"}'
+```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `BILLING_PROVIDER` | No | `mock` | Payment provider (`mock` or `alipay`) |
 
 ## Commands
 

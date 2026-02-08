@@ -41,6 +41,9 @@ describe('App (e2e)', () => {
   afterAll(async () => {
     await prisma.assessmentEvent.deleteMany({ where: { assessment: { user: { email: { in: [userA.email, userB.email] } } } } });
     await prisma.assessment.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+    await prisma.creditLedger.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+    await prisma.order.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+    await prisma.userBalance.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
     await prisma.recording.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
     await prisma.user.deleteMany({ where: { email: { in: [userA.email, userB.email] } } });
     await app.close();
@@ -301,6 +304,114 @@ describe('App (e2e)', () => {
         .post('/ai/assess')
         .send({ inputType: 'text', text: 'hello' })
         .expect(401);
+    });
+  });
+
+  describe('Billing flow: plans -> buy -> credits -> AI gate', () => {
+    let tokenA: string;
+    let planId: string;
+    let orderId: string;
+
+    beforeAll(async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send(userA)
+        .expect(200);
+      tokenA = res.body.accessToken;
+    });
+
+    it('GET /billing/plans returns at least 1 plan', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/billing/plans')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+      planId = res.body[0].id;
+    });
+
+    it('GET /billing/balance returns 0 credits', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/billing/balance')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(res.body.credits).toBe(0);
+    });
+
+    it('POST /billing/order creates a pending order', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/billing/order')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ planId })
+        .expect(201);
+
+      expect(res.body).toHaveProperty('id');
+      expect(res.body.status).toBe('PENDING');
+      orderId = res.body.id;
+    });
+
+    it('POST /billing/mock/pay fulfills the order', async () => {
+      await request(app.getHttpServer())
+        .post('/billing/mock/pay')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ orderId })
+        .expect(201);
+    });
+
+    it('GET /billing/balance returns 10 credits after purchase', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/billing/balance')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(res.body.credits).toBe(10);
+    });
+
+    it('POST /ai/assess succeeds with credits', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/ai/assess')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ inputType: 'text', text: 'I go to school yesterday and buyed a book' })
+        .expect(201);
+
+      expect(res.body).toHaveProperty('assessmentId');
+
+      // poll until done
+      const deadline = Date.now() + 5000;
+      let status = '';
+      while (Date.now() < deadline) {
+        const poll = await request(app.getHttpServer())
+          .get(`/ai/assess/${res.body.assessmentId}`)
+          .set('Authorization', `Bearer ${tokenA}`)
+          .expect(200);
+        status = poll.body.status;
+        if (status === 'SUCCEEDED' || status === 'FAILED') break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      expect(status).toBe('SUCCEEDED');
+    });
+
+    it('GET /billing/balance returns 9 credits after assessment', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/billing/balance')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(res.body.credits).toBe(9);
+    });
+
+    it('POST /ai/assess returns 402 when credits exhausted', async () => {
+      // set credits to 0 directly
+      const user = await prisma.user.findFirstOrThrow({ where: { email: userA.email } });
+      await prisma.userBalance.update({ where: { userId: user.id }, data: { credits: 0 } });
+
+      await request(app.getHttpServer())
+        .post('/ai/assess')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ inputType: 'text', text: 'hello world' })
+        .expect(402);
     });
   });
 });
