@@ -3,8 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { Observable, interval, from, EMPTY } from 'rxjs';
 import { switchMap, concatMap, tap, map, takeWhile } from 'rxjs/operators';
 import { PrismaService } from '../prisma';
-import { buildGraph } from './ai-coach.workflow';
+import { buildGraph, createLLM } from './ai-coach.workflow';
 import { AssessDto } from './dto';
+
+const STAGE_PCT: Record<string, [number, number]> = {
+  diagnose: [5, 25],
+  rewrite: [30, 50],
+  drills: [55, 75],
+  score: [80, 95],
+};
 
 @Injectable()
 export class AICoachService {
@@ -23,19 +30,15 @@ export class AICoachService {
       },
     });
 
-    // Fire and forget — workflow runs in background
     this.runWorkflow(assessment.id, dto).catch(() => {});
 
     return { assessmentId: assessment.id, traceId: assessment.traceId };
   }
 
   async runWorkflow(assessmentId: string, dto: AssessDto) {
-    const apiKey = this.config.get<string>('OPENAI_API_KEY');
-    if (!apiKey) {
-      await this.writeEvent(assessmentId, 0, 'ERROR', { message: 'OPENAI_API_KEY not configured' });
-      await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
-      return;
-    }
+    const provider = this.config.get<string>('AI_PROVIDER') || '';
+    const apiKey = this.config.get<string>('OPENAI_API_KEY') || '';
+    const isMock = provider === 'mock' || !apiKey;
 
     await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'RUNNING' } });
 
@@ -43,11 +46,22 @@ export class AICoachService {
     const temperature = parseFloat(this.config.get<string>('AI_TEMPERATURE') || '0.7');
 
     try {
-      const graph = buildGraph(apiKey, model, temperature);
       let seq = 0;
+      const llm = createLLM(isMock ? 'mock' : 'openai', apiKey, model, temperature);
 
-      await this.writeEvent(assessmentId, seq++, 'PROGRESS', { step: 'diagnose', pct: 10 });
-      const s1 = await graph.invoke({
+      const callbacks = {
+        beforeNode: async (name: string) => {
+          const pct = STAGE_PCT[name]?.[0] ?? 0;
+          await this.writeEvent(assessmentId, seq++, 'PROGRESS', { stage: name, pct });
+        },
+        afterNode: async (name: string) => {
+          const pct = STAGE_PCT[name]?.[1] ?? 0;
+          await this.writeEvent(assessmentId, seq++, 'PROGRESS', { stage: name, pct });
+        },
+      };
+
+      const graph = buildGraph(llm, callbacks);
+      const result = await graph.invoke({
         text: dto.text || '',
         goals: dto.goals || [],
         issues: [],
@@ -57,30 +71,21 @@ export class AICoachService {
         feedback: '',
       });
 
-      // Since LangGraph runs all nodes in sequence via invoke, we get the final state.
-      // We write progress events retroactively for the SSE consumer.
-      await this.writeEvent(assessmentId, seq++, 'PROGRESS', { step: 'rewrite', pct: 40 });
-      await this.writeEvent(assessmentId, seq++, 'PROGRESS', { step: 'drills', pct: 65 });
-      await this.writeEvent(assessmentId, seq++, 'PROGRESS', { step: 'score', pct: 90 });
-
-      const rubric = s1.rubric;
-      const feedback = s1.feedback;
-
       await this.writeEvent(assessmentId, seq++, 'FINAL', {
-        issues: s1.issues,
-        rewrites: s1.rewrites,
-        drills: s1.drills,
-        rubric,
-        feedback,
+        rubric: result.rubric,
+        issues: result.issues,
+        rewrites: result.rewrites,
+        drills: result.drills,
+        feedbackMarkdown: result.feedback,
       });
 
       await this.prisma.assessment.update({
         where: { id: assessmentId },
-        data: { status: 'SUCCEEDED', rubricJson: rubric, feedbackMarkdown: feedback },
+        data: { status: 'SUCCEEDED', rubricJson: result.rubric, feedbackMarkdown: result.feedback },
       });
     } catch (err) {
-      const seq = await this.prisma.assessmentEvent.count({ where: { assessmentId } });
-      await this.writeEvent(assessmentId, seq, 'ERROR', { message: String(err) });
+      const count = await this.prisma.assessmentEvent.count({ where: { assessmentId } });
+      await this.writeEvent(assessmentId, count, 'ERROR', { message: String(err) });
       await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
     }
   }
@@ -112,8 +117,24 @@ export class AICoachService {
     });
   }
 
-  streamEvents(assessmentId: string): Observable<MessageEvent> {
-    let lastSeq = -1;
+  async listAssessments(userId: string) {
+    return this.prisma.assessment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        status: true,
+        inputType: true,
+        inputText: true,
+        rubricJson: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  streamEvents(assessmentId: string, since = -1): Observable<MessageEvent> {
+    let lastSeq = since;
     return interval(500).pipe(
       switchMap(() =>
         from(
@@ -132,6 +153,7 @@ export class AICoachService {
           ({
             data: JSON.stringify(event.payloadJson),
             type: event.type.toLowerCase(),
+            id: String(event.seq),
           }) as MessageEvent,
       ),
       takeWhile((event) => event.type !== 'final' && event.type !== 'error', true),

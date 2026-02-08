@@ -1,11 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { Observable } from 'rxjs';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma';
 import { MinioService } from './../src/media';
-import { AICoachService } from './../src/ai-coach';
 
 describe('App (e2e)', () => {
   let app: INestApplication;
@@ -30,49 +28,6 @@ describe('App (e2e)', () => {
         presignedPutUrl: async () => 'http://localhost:9000/fake-put-url',
         presignedGetUrl: async () => 'http://localhost:9000/fake-get-url',
         deleteObject: async () => {},
-      })
-      .overrideProvider(AICoachService)
-      .useFactory({
-        factory: (prisma: PrismaService) => ({
-          createAssessment: async (userId: string, dto: { inputType: string; text?: string; recordingId?: string }) => {
-            const assessment = await prisma.assessment.create({
-              data: {
-                userId,
-                inputType: dto.inputType === 'text' ? 'TEXT' : 'RECORDING',
-                inputText: dto.text,
-                recordingId: dto.recordingId,
-              },
-            });
-            // simulate async workflow
-            setImmediate(async () => {
-              await prisma.assessmentEvent.create({ data: { assessmentId: assessment.id, seq: 0, type: 'PROGRESS', payloadJson: { step: 'diagnose', pct: 25 } } });
-              await prisma.assessmentEvent.create({ data: { assessmentId: assessment.id, seq: 1, type: 'PROGRESS', payloadJson: { step: 'score', pct: 75 } } });
-              await prisma.assessmentEvent.create({ data: { assessmentId: assessment.id, seq: 2, type: 'FINAL', payloadJson: { rubric: { grammar: 70, vocab: 80, fluency: 60, clarity: 75, naturalness: 65 }, feedback: '**Good effort!**', issues: ['past tense error'], rewrites: ['I went to school yesterday and bought a book.'], drills: ['Fix: I go -> ?'] } } });
-              await prisma.assessment.update({ where: { id: assessment.id }, data: { status: 'SUCCEEDED', rubricJson: { grammar: 70, vocab: 80, fluency: 60, clarity: 75, naturalness: 65 }, feedbackMarkdown: '**Good effort!**' } });
-            });
-            return { assessmentId: assessment.id, traceId: assessment.traceId };
-          },
-          getAssessment: async (userId: string, id: string) => {
-            return prisma.assessment.findFirst({ where: { id, userId }, select: { id: true, status: true, rubricJson: true, feedbackMarkdown: true, traceId: true, inputType: true, inputText: true, createdAt: true } });
-          },
-          streamEvents: (assessmentId: string) => {
-            return new Observable((subscriber) => {
-              const check = async () => {
-                const events = await prisma.assessmentEvent.findMany({ where: { assessmentId }, orderBy: { seq: 'asc' } });
-                for (const event of events) {
-                  subscriber.next({ data: JSON.stringify(event.payloadJson), type: event.type.toLowerCase() });
-                }
-                if (events.some((e) => e.type === 'FINAL' || e.type === 'ERROR')) {
-                  subscriber.complete();
-                } else {
-                  setTimeout(check, 100);
-                }
-              };
-              setTimeout(check, 100);
-            });
-          },
-        }),
-        inject: [PrismaService],
       })
       .compile();
 
@@ -275,7 +230,7 @@ describe('App (e2e)', () => {
     });
   });
 
-  describe('AI Coach flow: assess -> poll result -> stream', () => {
+  describe('AI Coach flow: assess -> poll result -> list', () => {
     let tokenA: string;
     let assessmentId: string;
 
@@ -287,7 +242,7 @@ describe('App (e2e)', () => {
       tokenA = res.body.accessToken;
     });
 
-    it('POST /ai/assess (text) returns assessmentId + traceId', async () => {
+    it('POST /ai/assess (text) returns assessmentId + traceId + sseUrl', async () => {
       const res = await request(app.getHttpServer())
         .post('/ai/assess')
         .set('Authorization', `Bearer ${tokenA}`)
@@ -300,9 +255,9 @@ describe('App (e2e)', () => {
       assessmentId = res.body.assessmentId;
     });
 
-    it('GET /ai/assess/:id returns succeeded after mock completes', async () => {
-      // wait for mock setImmediate to finish
-      await new Promise((r) => setTimeout(r, 500));
+    it('GET /ai/assess/:id returns succeeded with rubric structure', async () => {
+      // wait for async mock workflow to complete
+      await new Promise((r) => setTimeout(r, 3000));
 
       const res = await request(app.getHttpServer())
         .get(`/ai/assess/${assessmentId}`)
@@ -311,7 +266,26 @@ describe('App (e2e)', () => {
 
       expect(res.body.status).toBe('SUCCEEDED');
       expect(res.body.rubricJson).toBeDefined();
+      expect(res.body.rubricJson).toHaveProperty('grammar');
+      expect(res.body.rubricJson).toHaveProperty('vocab');
+      expect(res.body.rubricJson).toHaveProperty('fluency');
+      expect(res.body.rubricJson).toHaveProperty('clarity');
+      expect(res.body.rubricJson).toHaveProperty('naturalness');
       expect(res.body.feedbackMarkdown).toBeDefined();
+      expect(typeof res.body.feedbackMarkdown).toBe('string');
+    });
+
+    it('GET /ai/assessments lists recent assessments', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/ai/assessments')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+      expect(res.body[0]).toHaveProperty('id');
+      expect(res.body[0]).toHaveProperty('status');
+      expect(res.body[0]).toHaveProperty('rubricJson');
     });
 
     it('POST /ai/assess without auth returns 401', () => {

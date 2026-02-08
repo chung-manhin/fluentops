@@ -29,7 +29,7 @@
       <el-card v-if="streaming">
         <template #header><h2 class="text-lg font-medium">Progress</h2></template>
         <el-progress :percentage="progressPct" :status="progressPct === 100 ? 'success' : undefined" />
-        <p class="mt-2 text-sm text-gray-500">{{ progressStep }}</p>
+        <p class="mt-2 text-sm text-gray-500">{{ progressStage }}</p>
       </el-card>
 
       <!-- Error -->
@@ -39,7 +39,6 @@
       <el-card v-if="result">
         <template #header><h2 class="text-lg font-medium">Assessment Result</h2></template>
 
-        <!-- Rubric scores -->
         <div v-if="result.rubric" class="grid grid-cols-5 gap-4 mb-6">
           <div v-for="(val, key) in result.rubric" :key="key" class="text-center">
             <el-progress type="circle" :percentage="val" :width="80" />
@@ -47,7 +46,6 @@
           </div>
         </div>
 
-        <!-- Issues -->
         <div v-if="result.issues?.length" class="mb-4">
           <h3 class="font-medium mb-2">Issues Found</h3>
           <ul class="list-disc pl-5 space-y-1 text-sm">
@@ -55,7 +53,6 @@
           </ul>
         </div>
 
-        <!-- Rewrites -->
         <div v-if="result.rewrites?.length" class="mb-4">
           <h3 class="font-medium mb-2">Suggested Rewrites</h3>
           <ul class="list-decimal pl-5 space-y-1 text-sm">
@@ -63,7 +60,6 @@
           </ul>
         </div>
 
-        <!-- Drills -->
         <div v-if="result.drills?.length" class="mb-4">
           <h3 class="font-medium mb-2">Practice Drills</h3>
           <ul class="list-decimal pl-5 space-y-1 text-sm">
@@ -71,9 +67,26 @@
           </ul>
         </div>
 
-        <!-- Feedback -->
-        <div v-if="result.feedback" class="mt-4 p-4 bg-gray-50 rounded text-sm whitespace-pre-wrap">
-          {{ result.feedback }}
+        <div v-if="result.feedbackMarkdown" class="mt-4 p-4 bg-gray-50 rounded text-sm whitespace-pre-wrap">
+          {{ result.feedbackMarkdown }}
+        </div>
+      </el-card>
+
+      <!-- History -->
+      <el-card>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-medium">Recent Assessments</h2>
+            <el-button size="small" @click="loadHistory" :loading="historyLoading">Refresh</el-button>
+          </div>
+        </template>
+        <div v-if="history.length === 0" class="text-gray-400 text-sm">No assessments yet.</div>
+        <div v-for="item in history" :key="item.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium truncate">{{ item.inputText || '(recording)' }}</p>
+            <p class="text-xs text-gray-400">{{ new Date(item.createdAt).toLocaleString() }} · {{ item.status }}</p>
+          </div>
+          <el-button size="small" @click="viewAssessment(item.id)">View</el-button>
         </div>
       </el-card>
     </main>
@@ -81,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { http } from '../lib/http';
 
 interface AssessResult {
@@ -89,16 +102,58 @@ interface AssessResult {
   issues?: string[];
   rewrites?: string[];
   drills?: string[];
-  feedback?: string;
+  feedbackMarkdown?: string;
+}
+
+interface HistoryItem {
+  id: string;
+  status: string;
+  inputType: string;
+  inputText: string | null;
+  rubricJson: Record<string, number> | null;
+  createdAt: string;
 }
 
 const inputText = ref('');
 const loading = ref(false);
 const streaming = ref(false);
 const progressPct = ref(0);
-const progressStep = ref('');
+const progressStage = ref('');
 const errorMsg = ref('');
 const result = ref<AssessResult | null>(null);
+const history = ref<HistoryItem[]>([]);
+const historyLoading = ref(false);
+let lastEventId = -1;
+
+async function loadHistory() {
+  historyLoading.value = true;
+  try {
+    const { data } = await http.get<HistoryItem[]>('/ai/assessments');
+    history.value = data;
+  } catch {
+    // ignore
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+onMounted(loadHistory);
+
+async function viewAssessment(id: string) {
+  try {
+    const { data } = await http.get(`/ai/assess/${id}`);
+    if (data.status === 'SUCCEEDED') {
+      result.value = { rubric: data.rubricJson, feedbackMarkdown: data.feedbackMarkdown };
+      streaming.value = false;
+      errorMsg.value = '';
+    } else if (data.status === 'FAILED') {
+      errorMsg.value = 'Assessment failed';
+      result.value = null;
+    }
+  } catch {
+    errorMsg.value = 'Failed to load assessment';
+  }
+}
 
 async function submit() {
   loading.value = true;
@@ -106,7 +161,8 @@ async function submit() {
   errorMsg.value = '';
   result.value = null;
   progressPct.value = 0;
-  progressStep.value = '';
+  progressStage.value = '';
+  lastEventId = -1;
 
   try {
     const { data } = await http.post<{ assessmentId: string; sseUrl: string }>('/ai/assess', {
@@ -116,6 +172,7 @@ async function submit() {
 
     streaming.value = true;
     await readSSE(data.assessmentId);
+    await loadHistory();
   } catch {
     errorMsg.value = 'Failed to start assessment';
   } finally {
@@ -126,7 +183,8 @@ async function submit() {
 async function readSSE(assessmentId: string) {
   const baseUrl = http.defaults.baseURL || 'http://localhost:3000';
   const token = localStorage.getItem('accessToken');
-  const res = await fetch(`${baseUrl}/ai/assess/${assessmentId}/stream`, {
+  const sinceParam = lastEventId >= 0 ? `?since=${lastEventId}` : '';
+  const res = await fetch(`${baseUrl}/ai/assess/${assessmentId}/stream${sinceParam}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -152,17 +210,20 @@ async function readSSE(assessmentId: string) {
       const lines = part.split('\n');
       let eventType = '';
       let eventData = '';
+      let eventId = '';
       for (const line of lines) {
         if (line.startsWith('event: ')) eventType = line.slice(7);
         else if (line.startsWith('data: ')) eventData = line.slice(6);
+        else if (line.startsWith('id: ')) eventId = line.slice(4);
       }
+      if (eventId) lastEventId = parseInt(eventId, 10);
       if (!eventData) continue;
 
       try {
         const payload = JSON.parse(eventData);
         if (eventType === 'progress') {
           progressPct.value = payload.pct || 0;
-          progressStep.value = payload.step || '';
+          progressStage.value = payload.stage || '';
         } else if (eventType === 'final') {
           progressPct.value = 100;
           result.value = payload;
@@ -182,7 +243,7 @@ async function readSSE(assessmentId: string) {
     try {
       const { data } = await http.get(`/ai/assess/${assessmentId}`);
       if (data.status === 'SUCCEEDED' && data.rubricJson) {
-        result.value = { rubric: data.rubricJson, feedback: data.feedbackMarkdown };
+        result.value = { rubric: data.rubricJson, feedbackMarkdown: data.feedbackMarkdown };
         progressPct.value = 100;
       } else if (data.status === 'FAILED') {
         errorMsg.value = 'Assessment failed';

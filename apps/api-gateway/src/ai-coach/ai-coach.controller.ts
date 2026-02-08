@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Body,
+  Query,
   UseGuards,
   Req,
   Sse,
@@ -28,6 +29,12 @@ export class AICoachController {
     return { ...result, sseUrl: `/ai/assess/${result.assessmentId}/stream` };
   }
 
+  @Get('assessments')
+  listAssessments(@Req() req: Request) {
+    const userId = (req.user as { id: string }).id;
+    return this.aiCoachService.listAssessments(userId);
+  }
+
   @Get('assess/:id')
   async getAssessment(@Req() req: Request, @Param('id') id: string) {
     const userId = (req.user as { id: string }).id;
@@ -37,7 +44,8 @@ export class AICoachController {
   }
 
   @Sse('assess/:id/stream')
-  stream(@Param('id') id: string): Observable<MessageEvent> {
-    return this.aiCoachService.streamEvents(id);
+  stream(@Param('id') id: string, @Query('since') since?: string): Observable<MessageEvent> {
+    const sinceSeq = since ? parseInt(since, 10) : -1;
+    return this.aiCoachService.streamEvents(id, isNaN(sinceSeq) ? -1 : sinceSeq);
   }
 }

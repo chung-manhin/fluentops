@@ -41,6 +41,10 @@ class EnvVars {
   OPENAI_API_KEY?: string;
 
   @IsString()
+  @IsOptional()
+  AI_PROVIDER?: string;
+
+  @IsString()
   MODEL_NAME: string = 'gpt-4o-mini';
 
   @IsString()

@@ -192,13 +192,18 @@ curl http://localhost:3000/media/<id> \
 
 AI-powered English assessment: LangGraph 4-step workflow (diagnose → rewrite → drills → score) with SSE streaming.
 
+When `AI_PROVIDER=mock` or `OPENAI_API_KEY` is empty, the workflow uses a built-in mock LLM that returns deterministic results — safe for CI and local dev without an API key.
+
 ### Endpoints (all require Bearer token)
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/ai/assess` | Start assessment (returns assessmentId + SSE URL) |
 | GET | `/ai/assess/:id` | Get assessment result |
-| GET | `/ai/assess/:id/stream` | SSE stream of progress/token/final events |
+| GET | `/ai/assess/:id/stream` | SSE stream of progress/final events |
+| GET | `/ai/assessments` | List recent assessments (newest first) |
+
+SSE reconnection: pass `?since=<lastSeq>` to resume from a specific event sequence number. Each SSE event includes an `id:` field with the seq number.
 
 ### curl Examples
 
@@ -219,13 +224,41 @@ curl http://localhost:3000/ai/assess/<assessmentId> \
 # SSE stream
 curl -N http://localhost:3000/ai/assess/<assessmentId>/stream \
   -H "Authorization: Bearer $TOKEN"
+
+# SSE reconnect from seq 3
+curl -N "http://localhost:3000/ai/assess/<assessmentId>/stream?since=3" \
+  -H "Authorization: Bearer $TOKEN"
+
+# List recent assessments
+curl http://localhost:3000/ai/assessments \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### SSE Event Format
+
+```
+event: progress
+data: {"stage":"diagnose","pct":5}
+id: 0
+
+event: progress
+data: {"stage":"diagnose","pct":25}
+id: 1
+
+event: final
+data: {"rubric":{"grammar":40,...},"issues":[...],"rewrites":[...],"drills":[...],"feedbackMarkdown":"..."}
+id: 8
+
+event: error
+data: {"message":"..."}
 ```
 
 ### Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `OPENAI_API_KEY` | No | — | OpenAI API key (assessment fails gracefully without it) |
+| `AI_PROVIDER` | No | — | Set to `mock` to use deterministic mock LLM |
+| `OPENAI_API_KEY` | No | — | OpenAI API key (mock used if empty) |
 | `MODEL_NAME` | No | `gpt-4o-mini` | OpenAI model name |
 | `AI_TEMPERATURE` | No | `0.7` | LLM temperature |
 
