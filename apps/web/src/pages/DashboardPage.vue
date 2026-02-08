@@ -3,7 +3,10 @@
     <header class="border-b bg-white">
       <div class="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
         <h1 class="text-lg font-semibold">FluentOps Dashboard</h1>
-        <el-button @click="handleLogout" :loading="loggingOut">Logout</el-button>
+        <div class="flex gap-2">
+          <el-button @click="$router.push('/speaking')">Speaking</el-button>
+          <el-button @click="handleLogout" :loading="loggingOut">Logout</el-button>
+        </div>
       </div>
     </header>
 

@@ -16,6 +16,21 @@ class EnvVars {
 
   @IsString()
   REFRESH_TOKEN_TTL: string = '7d';
+
+  @IsString()
+  MINIO_ENDPOINT: string = 'localhost';
+
+  @IsString()
+  MINIO_PORT: string = '9000';
+
+  @IsString()
+  MINIO_ACCESS_KEY: string = 'minio';
+
+  @IsString()
+  MINIO_SECRET_KEY: string = 'minio123456';
+
+  @IsString()
+  MINIO_BUCKET: string = 'fluentops';
 }
 
 export function validate(config: Record<string, unknown>) {

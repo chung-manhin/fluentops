@@ -63,6 +63,10 @@ export default [
         sourceType: 'module',
         extraFileExtensions: ['.vue'],
       },
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
     plugins: {
       vue,

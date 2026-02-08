@@ -13,6 +13,7 @@ model User {
   passwordHash String
   createdAt    DateTime       @default(now())
   refreshTokens RefreshToken[]
+  recordings    Recording[]
 }
 
 model RefreshToken {
@@ -27,4 +28,24 @@ model RefreshToken {
 
   @@index([userId])
   @@index([tokenHash])
+}
+
+model Recording {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  objectKey   String
+  filename    String
+  mimeType    String            @default("audio/webm")
+  bytes       Int               @default(0)
+  durationMs  Int?
+  status      RecordingStatus   @default(PENDING)
+  createdAt   DateTime          @default(now())
+
+  @@index([userId])
+}
+
+enum RecordingStatus {
+  PENDING
+  UPLOADED
 }
