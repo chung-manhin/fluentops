@@ -26,9 +26,6 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma Client
-        run: pnpm --filter api-gateway prisma generate
-
       - name: Lint
         run: pnpm lint
 
@@ -79,9 +76,6 @@ jobs:
 
       - name: Build shared
         run: pnpm --filter @fluentops/shared build
-
-      - name: Generate Prisma Client
-        run: pnpm --filter api-gateway prisma generate
 
       - name: Push DB Schema
         run: pnpm --filter api-gateway prisma db push
