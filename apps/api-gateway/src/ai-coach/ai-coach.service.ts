@@ -163,7 +163,7 @@ export class AICoachService {
       map(
         (event) =>
           ({
-            data: JSON.stringify(event.payloadJson),
+            data: event.payloadJson,
             type: event.type.toLowerCase(),
             id: String(event.seq),
           }) as MessageEvent,
