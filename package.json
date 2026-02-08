@@ -1,0 +1,32 @@
+{
+  "name": "fluentops",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "dev": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run dev --parallel",
+    "lint": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run lint",
+    "typecheck": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run typecheck",
+    "test": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run test",
+    "build": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run build",
+    "format": "prettier . --check",
+    "format:write": "prettier . --write"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/node": "^25.2.2",
+    "eslint": "^9.20.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-vue": "^9.32.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.4.1",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.23.0",
+    "vitest": "^2.1.9",
+    "vue-eslint-parser": "^9.4.3"
+  }
+}
