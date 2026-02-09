@@ -132,6 +132,7 @@ dynamodb_local/
 
 # Database dumps
 *.sql
+!**/prisma/migrations/**/*.sql
 *.dump
 
 # Environment files

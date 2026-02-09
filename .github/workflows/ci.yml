@@ -90,7 +90,7 @@ jobs:
 
       - name: Setup DB
         working-directory: apps/api-gateway
-        run: npx prisma generate && npx prisma db push --skip-generate
+        run: npx prisma generate && npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://fluentops:fluentops@localhost:5432/fluentops_test
 
