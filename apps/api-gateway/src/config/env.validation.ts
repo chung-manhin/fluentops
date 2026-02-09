@@ -67,6 +67,10 @@ class EnvVars {
 
   @IsString()
   @IsOptional()
+  CORS_ORIGIN?: string;
+
+  @IsString()
+  @IsOptional()
   ALIPAY_GATEWAY?: string;
 
   @IsString()

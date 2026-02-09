@@ -52,8 +52,9 @@ export class AICoachController {
   }
 
   @Sse('assess/:id/stream')
-  stream(@Param('id') id: string, @Query('since') since?: string): Observable<MessageEvent> {
+  stream(@Req() req: Request, @Param('id') id: string, @Query('since') since?: string): Observable<MessageEvent> {
+    const userId = (req.user as { id: string }).id;
     const sinceSeq = since ? parseInt(since, 10) : -1;
-    return this.aiCoachService.streamEvents(id, isNaN(sinceSeq) ? -1 : sinceSeq);
+    return this.aiCoachService.streamEvents(id, userId, isNaN(sinceSeq) ? -1 : sinceSeq);
   }
 }

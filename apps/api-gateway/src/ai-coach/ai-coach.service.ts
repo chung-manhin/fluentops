@@ -148,18 +148,32 @@ export class AICoachService {
     });
   }
 
-  streamEvents(assessmentId: string, since = -1): Observable<MessageEvent> {
+  streamEvents(assessmentId: string, userId: string, since = -1): Observable<MessageEvent> {
     let lastSeq = since;
+    let verified = false;
     return interval(500).pipe(
-      switchMap(() =>
-        from(
+      switchMap(() => {
+        if (!verified) {
+          return from(
+            this.prisma.assessment.findFirst({ where: { id: assessmentId, userId } }).then((a) => {
+              if (!a) return [];
+              verified = true;
+              return this.prisma.assessmentEvent.findMany({
+                where: { assessmentId, seq: { gt: lastSeq } },
+                orderBy: { seq: 'asc' },
+                take: 50,
+              });
+            }),
+          );
+        }
+        return from(
           this.prisma.assessmentEvent.findMany({
             where: { assessmentId, seq: { gt: lastSeq } },
             orderBy: { seq: 'asc' },
             take: 50,
           }),
-        ),
-      ),
+        );
+      }),
       concatMap((events) => (events.length ? from(events) : EMPTY)),
       tap((event) => {
         lastSeq = event.seq;
