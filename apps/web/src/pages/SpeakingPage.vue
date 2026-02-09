@@ -3,7 +3,7 @@
     <!-- Recorder -->
     <el-card>
       <template #header><h2 class="text-lg font-medium">{{ $t('speaking.record') }}</h2></template>
-      <div class="flex items-center gap-4">
+      <div class="flex flex-wrap items-center gap-4">
         <el-button
           v-if="state === 'idle'"
           type="danger"

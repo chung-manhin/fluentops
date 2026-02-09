@@ -2,7 +2,7 @@
   <div class="min-h-screen flex flex-col">
     <!-- Nav -->
     <header class="bg-white border-b">
-      <div class="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
+      <div class="mx-auto max-w-5xl px-4 sm:px-6 py-4 flex items-center justify-between">
         <span class="text-lg font-bold text-indigo-600">FluentOps</span>
         <div class="flex items-center gap-3">
           <button class="text-xs text-slate-400 hover:text-slate-600" @click="handleToggleLocale">{{ $t('nav.lang') }}</button>
@@ -18,11 +18,11 @@
     </header>
 
     <!-- Hero -->
-    <section class="bg-gradient-to-b from-indigo-50 to-white py-20">
-      <div class="mx-auto max-w-3xl px-6 text-center">
-        <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">{{ $t('home.hero.title') }}</h1>
-        <p class="mt-4 text-lg text-slate-600">{{ $t('home.hero.desc') }}</p>
-        <div class="mt-8 flex justify-center gap-4">
+    <section class="bg-gradient-to-b from-indigo-50 to-white py-12 sm:py-20">
+      <div class="mx-auto max-w-3xl px-4 sm:px-6 text-center">
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">{{ $t('home.hero.title') }}</h1>
+        <p class="mt-4 text-base sm:text-lg text-slate-600">{{ $t('home.hero.desc') }}</p>
+        <div class="mt-8 flex flex-wrap justify-center gap-4">
           <template v-if="authStore.isAuthenticated">
             <router-link to="/dashboard" class="rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700">{{ $t('home.hero.dashboard') }}</router-link>
           </template>
