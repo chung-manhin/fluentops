@@ -12,6 +12,7 @@ import {
   HttpException,
   MessageEvent,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -19,6 +20,7 @@ import { BillingService } from '../billing';
 import { AICoachService } from './ai-coach.service';
 import { AssessDto } from './dto';
 
+@ApiTags('ai-coach')
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
 export class AICoachController {

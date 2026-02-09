@@ -9,11 +9,13 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PresignDto, CompleteUploadDto } from './dto';
 
+@ApiTags('media')
 @Controller('media')
 @UseGuards(JwtAuthGuard)
 export class MediaController {

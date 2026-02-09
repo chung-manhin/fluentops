@@ -1,9 +1,11 @@
 import { Controller, Get, Post, Body, UseGuards, Req, Res } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
 import { CreateOrderDto, MockPayDto } from './dto';
 
+@ApiTags('billing')
 @Controller('billing')
 export class BillingController {
   constructor(private billingService: BillingService) {}
