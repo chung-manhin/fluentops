@@ -18,11 +18,15 @@ export class AlipayService {
       return;
     }
 
-    // Dynamic import to avoid loading SDK when not needed
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { AlipaySdk } = require('alipay-sdk') as typeof import('alipay-sdk');
-    const gateway = this.config.get<string>('ALIPAY_GATEWAY') || 'https://openapi-sandbox.dl.alipaydev.com/gateway.do';
-    this.sdk = new AlipaySdk({ appId, privateKey, alipayPublicKey, endpoint: gateway });
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { AlipaySdk } = require('alipay-sdk') as typeof import('alipay-sdk');
+      const gateway = this.config.get<string>('ALIPAY_GATEWAY') || 'https://openapi-sandbox.dl.alipaydev.com/gateway.do';
+      this.sdk = new AlipaySdk({ appId, privateKey, alipayPublicKey, gateway, keyType: 'PKCS8' });
+      this.logger.log('Alipay SDK initialized');
+    } catch (err) {
+      this.logger.error('Failed to initialize Alipay SDK — alipay disabled', (err as Error).message);
+    }
   }
 
   isEnabled() {
