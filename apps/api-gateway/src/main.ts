@@ -3,11 +3,13 @@ import { ValidationPipe } from '@nestjs/common';
 import * as express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
   app.use(express.urlencoded({ extended: true }));
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
   app.enableCors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
