@@ -111,8 +111,8 @@ gitleaks protect --staged -v
 | 12 | Gitignore hardening | Done |
 | 13 | CI secrets scanning (gitleaks) | Done |
 | 14 | httpOnly cookie for refresh token | Future — requires frontend refactor |
-| 15 | SECURITY.md with disclosure policy | Future — repo governance decision |
-| 16 | LICENSE file | Future — repo governance decision |
+| 15 | SECURITY.md with disclosure policy | Done |
+| 16 | LICENSE file (MIT) | Done |
 | 16 | Redis authentication in docker-compose | Future — infra hardening |
 | 17 | Production Dockerfile with multi-stage build | Future — deployment |
 | 18 | Pin GitHub Actions to SHA | Future — supply chain |
