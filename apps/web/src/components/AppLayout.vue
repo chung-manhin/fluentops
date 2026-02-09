@@ -26,10 +26,10 @@
         :key="item.to"
         :to="item.to"
         :class="[
-          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors border-l-2',
           $route.path === item.to
-            ? 'bg-indigo-50 text-indigo-600'
-            : 'text-slate-600 hover:bg-slate-50',
+            ? 'bg-indigo-50 text-indigo-600 border-indigo-600'
+            : 'text-slate-600 hover:bg-slate-50 border-transparent',
         ]"
         @click="sidebarOpen = false"
       >

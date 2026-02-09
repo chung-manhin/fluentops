@@ -18,7 +18,7 @@
     </header>
 
     <!-- Hero -->
-    <section class="bg-white py-20">
+    <section class="bg-gradient-to-b from-indigo-50 to-white py-20">
       <div class="mx-auto max-w-3xl px-6 text-center">
         <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">{{ $t('home.hero.title') }}</h1>
         <p class="mt-4 text-lg text-slate-600">{{ $t('home.hero.desc') }}</p>
@@ -39,7 +39,7 @@
       <div class="mx-auto max-w-5xl px-6">
         <h2 class="text-center text-2xl font-bold text-slate-900">{{ $t('home.features.title') }}</h2>
         <div class="mt-10 grid gap-8 sm:grid-cols-3">
-          <div v-for="f in features" :key="f.titleKey" class="rounded-lg bg-white p-6 shadow-sm">
+          <div v-for="f in features" :key="f.titleKey" class="rounded-lg bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
             <div class="text-3xl">{{ f.icon }}</div>
             <h3 class="mt-3 font-semibold text-slate-900">{{ $t(f.titleKey) }}</h3>
             <p class="mt-2 text-sm text-slate-600">{{ $t(f.descKey) }}</p>
