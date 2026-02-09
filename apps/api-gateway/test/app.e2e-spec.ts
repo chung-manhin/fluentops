@@ -35,6 +35,7 @@ describe('App (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1', { exclude: ['health'] });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
     await app.init();
 
@@ -63,9 +64,9 @@ describe('App (e2e)', () => {
     let accessToken: string;
     let refreshToken: string;
 
-    it('POST /auth/register', async () => {
+    it('POST /api/v1/auth/register', async () => {
       const res = await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/api/v1/auth/register')
         .send(userA)
         .expect(201);
 
@@ -73,9 +74,9 @@ describe('App (e2e)', () => {
       expect(res.body.email).toBe(userA.email);
     });
 
-    it('POST /auth/login', async () => {
+    it('POST /api/v1/auth/login', async () => {
       const res = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send(userA)
         .expect(200);
 
@@ -85,18 +86,18 @@ describe('App (e2e)', () => {
       refreshToken = res.body.refreshToken;
     });
 
-    it('GET /me with accessToken', async () => {
+    it('GET /api/v1/me with accessToken', async () => {
       const res = await request(app.getHttpServer())
-        .get('/me')
+        .get('/api/v1/me')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
       expect(res.body.email).toBe(userA.email);
     });
 
-    it('POST /auth/refresh (rotation)', async () => {
+    it('POST /api/v1/auth/refresh (rotation)', async () => {
       const res = await request(app.getHttpServer())
-        .post('/auth/refresh')
+        .post('/api/v1/auth/refresh')
         .send({ refreshToken })
         .expect(200);
 
@@ -107,25 +108,25 @@ describe('App (e2e)', () => {
       refreshToken = res.body.refreshToken;
     });
 
-    it('GET /me with new accessToken', async () => {
+    it('GET /api/v1/me with new accessToken', async () => {
       const res = await request(app.getHttpServer())
-        .get('/me')
+        .get('/api/v1/me')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
       expect(res.body.email).toBe(userA.email);
     });
 
-    it('POST /auth/logout', async () => {
+    it('POST /api/v1/auth/logout', async () => {
       await request(app.getHttpServer())
-        .post('/auth/logout')
+        .post('/api/v1/auth/logout')
         .send({ refreshToken })
         .expect(204);
     });
 
-    it('POST /auth/refresh with revoked token fails', async () => {
+    it('POST /api/v1/auth/refresh with revoked token fails', async () => {
       await request(app.getHttpServer())
-        .post('/auth/refresh')
+        .post('/api/v1/auth/refresh')
         .send({ refreshToken })
         .expect(401);
     });
@@ -140,26 +141,26 @@ describe('App (e2e)', () => {
     beforeAll(async () => {
       // login userA
       const resA = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send(userA)
         .expect(200);
       tokenA = resA.body.accessToken;
 
       // register + login userB
       await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/api/v1/auth/register')
         .send(userB)
         .expect(201);
       const resB = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send(userB)
         .expect(200);
       tokenB = resB.body.accessToken;
     });
 
-    it('POST /media/presign returns uploadUrl, objectKey, fileUrl', async () => {
+    it('POST /api/v1/media/presign returns uploadUrl, objectKey, fileUrl', async () => {
       const res = await request(app.getHttpServer())
-        .post('/media/presign')
+        .post('/api/v1/media/presign')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ filename: 'test.webm', contentType: 'audio/webm' })
         .expect(200);
@@ -171,17 +172,17 @@ describe('App (e2e)', () => {
       objectKey = res.body.objectKey;
     });
 
-    it('POST /media/presign rejects invalid contentType', async () => {
+    it('POST /api/v1/media/presign rejects invalid contentType', async () => {
       await request(app.getHttpServer())
-        .post('/media/presign')
+        .post('/api/v1/media/presign')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ filename: 'test.mp4', contentType: 'video/mp4' })
         .expect(400);
     });
 
-    it('POST /media/complete writes to DB', async () => {
+    it('POST /api/v1/media/complete writes to DB', async () => {
       const res = await request(app.getHttpServer())
-        .post('/media/complete')
+        .post('/api/v1/media/complete')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ objectKey, sizeBytes: 12345, mimeType: 'audio/webm', durationMs: 5000 })
         .expect(200);
@@ -192,9 +193,9 @@ describe('App (e2e)', () => {
       recordingId = res.body.id;
     });
 
-    it('GET /media lists recordings for current user', async () => {
+    it('GET /api/v1/media lists recordings for current user', async () => {
       const res = await request(app.getHttpServer())
-        .get('/media')
+        .get('/api/v1/media')
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
@@ -203,9 +204,9 @@ describe('App (e2e)', () => {
       expect(res.body[0]).toHaveProperty('url');
     });
 
-    it('GET /media/:id returns detail with playUrl', async () => {
+    it('GET /api/v1/media/:id returns detail with playUrl', async () => {
       const res = await request(app.getHttpServer())
-        .get(`/media/${recordingId}`)
+        .get(`/api/v1/media/${recordingId}`)
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
@@ -215,7 +216,7 @@ describe('App (e2e)', () => {
 
     it('userB cannot see userA recordings via GET /media', async () => {
       const res = await request(app.getHttpServer())
-        .get('/media')
+        .get('/api/v1/media')
         .set('Authorization', `Bearer ${tokenB}`)
         .expect(200);
 
@@ -224,14 +225,14 @@ describe('App (e2e)', () => {
 
     it('userB cannot access userA recording detail', async () => {
       await request(app.getHttpServer())
-        .get(`/media/${recordingId}`)
+        .get(`/api/v1/media/${recordingId}`)
         .set('Authorization', `Bearer ${tokenB}`)
         .expect(404);
     });
 
-    it('GET /media without auth returns 401', () => {
+    it('GET /api/v1/media without auth returns 401', () => {
       return request(app.getHttpServer())
-        .get('/media')
+        .get('/api/v1/media')
         .expect(401);
     });
   });
@@ -242,7 +243,7 @@ describe('App (e2e)', () => {
 
     beforeAll(async () => {
       const res = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send(userA)
         .expect(200);
       tokenA = res.body.accessToken;
@@ -256,9 +257,9 @@ describe('App (e2e)', () => {
       });
     });
 
-    it('POST /ai/assess (text) returns assessmentId + traceId + sseUrl', async () => {
+    it('POST /api/v1/ai/assess (text) returns assessmentId + traceId + sseUrl', async () => {
       const res = await request(app.getHttpServer())
-        .post('/ai/assess')
+        .post('/api/v1/ai/assess')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ inputType: 'text', text: 'I go to school yesterday and buyed a book' })
         .expect(201);
@@ -269,14 +270,14 @@ describe('App (e2e)', () => {
       assessmentId = res.body.assessmentId;
     });
 
-    it('GET /ai/assess/:id returns succeeded with rubric structure', async () => {
+    it('GET /api/v1/ai/assess/:id returns succeeded with rubric structure', async () => {
       // poll until SUCCEEDED or timeout 5s
       let status = '';
       let body: Record<string, unknown> = {};
       const deadline = Date.now() + 5000;
       while (Date.now() < deadline) {
         const res = await request(app.getHttpServer())
-          .get(`/ai/assess/${assessmentId}`)
+          .get(`/api/v1/ai/assess/${assessmentId}`)
           .set('Authorization', `Bearer ${tokenA}`)
           .expect(200);
         body = res.body;
@@ -297,9 +298,9 @@ describe('App (e2e)', () => {
       expect(typeof body.feedbackMarkdown).toBe('string');
     });
 
-    it('GET /ai/assessments lists recent assessments', async () => {
+    it('GET /api/v1/ai/assessments lists recent assessments', async () => {
       const res = await request(app.getHttpServer())
-        .get('/ai/assessments')
+        .get('/api/v1/ai/assessments')
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
@@ -310,9 +311,9 @@ describe('App (e2e)', () => {
       expect(res.body[0]).toHaveProperty('rubricJson');
     });
 
-    it('POST /ai/assess without auth returns 401', () => {
+    it('POST /api/v1/ai/assess without auth returns 401', () => {
       return request(app.getHttpServer())
-        .post('/ai/assess')
+        .post('/api/v1/ai/assess')
         .send({ inputType: 'text', text: 'hello' })
         .expect(401);
     });
@@ -325,7 +326,7 @@ describe('App (e2e)', () => {
 
     beforeAll(async () => {
       const res = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send(userA)
         .expect(200);
       tokenA = res.body.accessToken;
@@ -335,9 +336,9 @@ describe('App (e2e)', () => {
       await prisma.userBalance.deleteMany({ where: { userId: user.id } });
     });
 
-    it('GET /billing/plans returns at least 1 plan', async () => {
+    it('GET /api/v1/billing/plans returns at least 1 plan', async () => {
       const res = await request(app.getHttpServer())
-        .get('/billing/plans')
+        .get('/api/v1/billing/plans')
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
@@ -346,18 +347,18 @@ describe('App (e2e)', () => {
       planId = res.body[0].id;
     });
 
-    it('GET /billing/balance returns 0 credits', async () => {
+    it('GET /api/v1/billing/balance returns 0 credits', async () => {
       const res = await request(app.getHttpServer())
-        .get('/billing/balance')
+        .get('/api/v1/billing/balance')
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
       expect(res.body.credits).toBe(0);
     });
 
-    it('POST /billing/order creates a pending order', async () => {
+    it('POST /api/v1/billing/order creates a pending order', async () => {
       const res = await request(app.getHttpServer())
-        .post('/billing/order')
+        .post('/api/v1/billing/order')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ planId })
         .expect(201);
@@ -367,26 +368,26 @@ describe('App (e2e)', () => {
       orderId = res.body.id;
     });
 
-    it('POST /billing/mock/pay fulfills the order', async () => {
+    it('POST /api/v1/billing/mock/pay fulfills the order', async () => {
       await request(app.getHttpServer())
-        .post('/billing/mock/pay')
+        .post('/api/v1/billing/mock/pay')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ orderId })
         .expect(201);
     });
 
-    it('GET /billing/balance returns 10 credits after purchase', async () => {
+    it('GET /api/v1/billing/balance returns 10 credits after purchase', async () => {
       const res = await request(app.getHttpServer())
-        .get('/billing/balance')
+        .get('/api/v1/billing/balance')
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
       expect(res.body.credits).toBe(10);
     });
 
-    it('POST /ai/assess succeeds with credits', async () => {
+    it('POST /api/v1/ai/assess succeeds with credits', async () => {
       const res = await request(app.getHttpServer())
-        .post('/ai/assess')
+        .post('/api/v1/ai/assess')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ inputType: 'text', text: 'I go to school yesterday and buyed a book' })
         .expect(201);
@@ -398,7 +399,7 @@ describe('App (e2e)', () => {
       let status = '';
       while (Date.now() < deadline) {
         const poll = await request(app.getHttpServer())
-          .get(`/ai/assess/${res.body.assessmentId}`)
+          .get(`/api/v1/ai/assess/${res.body.assessmentId}`)
           .set('Authorization', `Bearer ${tokenA}`)
           .expect(200);
         status = poll.body.status;
@@ -408,22 +409,22 @@ describe('App (e2e)', () => {
       expect(status).toBe('SUCCEEDED');
     });
 
-    it('GET /billing/balance returns 9 credits after assessment', async () => {
+    it('GET /api/v1/billing/balance returns 9 credits after assessment', async () => {
       const res = await request(app.getHttpServer())
-        .get('/billing/balance')
+        .get('/api/v1/billing/balance')
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
       expect(res.body.credits).toBe(9);
     });
 
-    it('POST /ai/assess returns 402 when credits exhausted', async () => {
+    it('POST /api/v1/ai/assess returns 402 when credits exhausted', async () => {
       // set credits to 0 directly
       const user = await prisma.user.findFirstOrThrow({ where: { email: userA.email } });
       await prisma.userBalance.update({ where: { userId: user.id }, data: { credits: 0 } });
 
       await request(app.getHttpServer())
-        .post('/ai/assess')
+        .post('/api/v1/ai/assess')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ inputType: 'text', text: 'hello world' })
         .expect(402);

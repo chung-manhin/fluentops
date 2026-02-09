@@ -11,6 +11,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.use(helmet());
   app.use(express.urlencoded({ extended: true }));
+  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
   app.enableCors({

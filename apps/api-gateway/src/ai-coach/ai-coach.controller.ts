@@ -34,7 +34,7 @@ export class AICoachController {
       throw new HttpException('INSUFFICIENT_CREDITS', 402);
     }
     const result = await this.aiCoachService.createAssessment(userId, dto);
-    return { ...result, sseUrl: `/ai/assess/${result.assessmentId}/stream` };
+    return { ...result, sseUrl: `/api/v1/ai/assess/${result.assessmentId}/stream` };
   }
 
   @Get('assessments')
