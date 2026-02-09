@@ -2,7 +2,7 @@
   <main class="mx-auto max-w-4xl px-6 py-10 space-y-6">
     <!-- Recorder -->
     <el-card>
-      <template #header><h2 class="text-lg font-medium">Record</h2></template>
+      <template #header><h2 class="text-lg font-medium">{{ $t('speaking.record') }}</h2></template>
       <div class="flex items-center gap-4">
         <el-button
           v-if="state === 'idle'"
@@ -10,39 +10,39 @@
           @click="startRecording"
           :disabled="uploading"
         >
-          Start Recording
+          {{ $t('speaking.startRecording') }}
         </el-button>
         <el-button v-if="state === 'recording'" type="warning" @click="pauseRecording">
-          Pause
+          {{ $t('speaking.pause') }}
         </el-button>
         <el-button v-if="state === 'paused'" type="success" @click="resumeRecording">
-          Resume
+          {{ $t('speaking.resume') }}
         </el-button>
         <el-button v-if="state !== 'idle'" type="info" @click="stopRecording">
-          Stop
+          {{ $t('speaking.stop') }}
         </el-button>
-        <span v-if="state === 'recording'" class="text-sm text-red-500 animate-pulse">● Recording…</span>
-        <span v-if="state === 'paused'" class="text-sm text-yellow-500">⏸ Paused</span>
-        <span v-if="uploading" class="text-sm text-blue-500">Uploading…</span>
+        <span v-if="state === 'recording'" class="text-sm text-red-500 animate-pulse">{{ $t('speaking.recording') }}</span>
+        <span v-if="state === 'paused'" class="text-sm text-yellow-500">{{ $t('speaking.paused') }}</span>
+        <span v-if="uploading" class="text-sm text-blue-500">{{ $t('speaking.uploading') }}</span>
       </div>
     </el-card>
 
     <!-- Recordings list -->
     <el-card>
-      <template #header><h2 class="text-lg font-medium">My Recordings</h2></template>
-      <div v-if="recordings.length === 0" class="text-gray-400 text-sm">No recordings yet.</div>
+      <template #header><h2 class="text-lg font-medium">{{ $t('speaking.myRecordings') }}</h2></template>
+      <div v-if="recordings.length === 0" class="text-gray-400 text-sm">{{ $t('speaking.noRecordings') }}</div>
       <div v-for="rec in recordings" :key="rec.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
         <div>
           <p class="text-sm font-medium">{{ rec.objectKey.split('/').pop() }}</p>
           <p class="text-xs text-gray-400">{{ new Date(rec.createdAt).toLocaleString() }} · {{ formatBytes(rec.sizeBytes) }}</p>
         </div>
-        <el-button size="small" @click="play(rec.id)">Play</el-button>
+        <el-button size="small" @click="play(rec.id)">{{ $t('speaking.play') }}</el-button>
       </div>
     </el-card>
 
     <!-- Player -->
     <el-card v-if="playUrl">
-      <template #header><h2 class="text-lg font-medium">Playback</h2></template>
+      <template #header><h2 class="text-lg font-medium">{{ $t('speaking.playback') }}</h2></template>
       <audio :src="playUrl" controls class="w-full" />
     </el-card>
   </main>
@@ -50,8 +50,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { http } from '../lib/http';
+
+const { t } = useI18n();
 
 interface RecordingItem {
   id: string;
@@ -96,7 +99,7 @@ async function startRecording() {
     mediaRecorder.start();
     state.value = 'recording';
   } catch {
-    ElMessage.error('Microphone access denied');
+    ElMessage.error(t('speaking.micDenied'));
   }
 }
 
@@ -137,10 +140,10 @@ async function uploadBlob(blob: Blob, durationMs: number) {
       durationMs,
     });
 
-    ElMessage.success('Recording uploaded');
+    ElMessage.success(t('speaking.uploaded'));
     await loadRecordings();
   } catch {
-    ElMessage.error('Upload failed, please retry');
+    ElMessage.error(t('speaking.uploadFailed'));
   } finally {
     uploading.value = false;
   }

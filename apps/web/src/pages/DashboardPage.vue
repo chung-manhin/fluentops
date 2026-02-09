@@ -1,28 +1,28 @@
 <template>
   <main class="mx-auto max-w-4xl px-6 py-10 space-y-6">
     <!-- Welcome -->
-    <h1 class="text-2xl font-bold text-slate-900">Welcome back, {{ authStore.user?.email }}</h1>
+    <h1 class="text-2xl font-bold text-slate-900">{{ $t('dashboard.welcome', { email: authStore.user?.email }) }}</h1>
 
     <!-- Stats -->
     <div class="grid gap-4 sm:grid-cols-3">
       <el-card shadow="hover">
         <el-skeleton v-if="loadingStats" :rows="1" animated />
         <template v-else>
-          <p class="text-sm text-slate-500">Credit Balance</p>
+          <p class="text-sm text-slate-500">{{ $t('dashboard.creditBalance') }}</p>
           <p class="mt-1 text-3xl font-bold">{{ creditBalance }}</p>
         </template>
       </el-card>
       <el-card shadow="hover">
         <el-skeleton v-if="loadingStats" :rows="1" animated />
         <template v-else>
-          <p class="text-sm text-slate-500">Total Recordings</p>
+          <p class="text-sm text-slate-500">{{ $t('dashboard.totalRecordings') }}</p>
           <p class="mt-1 text-3xl font-bold">{{ totalRecordings }}</p>
         </template>
       </el-card>
       <el-card shadow="hover">
         <el-skeleton v-if="loadingStats" :rows="1" animated />
         <template v-else>
-          <p class="text-sm text-slate-500">Total Assessments</p>
+          <p class="text-sm text-slate-500">{{ $t('dashboard.totalAssessments') }}</p>
           <p class="mt-1 text-3xl font-bold">{{ totalAssessments }}</p>
         </template>
       </el-card>
@@ -30,17 +30,17 @@
 
     <!-- Quick actions -->
     <div class="flex flex-wrap gap-3">
-      <router-link to="/speaking" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Start Recording</router-link>
-      <router-link to="/coach" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">New Assessment</router-link>
-      <router-link to="/billing" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Buy Credits</router-link>
+      <router-link to="/speaking" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">{{ $t('dashboard.startRecording') }}</router-link>
+      <router-link to="/coach" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">{{ $t('dashboard.newAssessment') }}</router-link>
+      <router-link to="/billing" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ $t('dashboard.buyCredits') }}</router-link>
     </div>
 
     <!-- Recent assessments -->
     <el-card>
-      <template #header><h2 class="text-lg font-medium">Recent Assessments</h2></template>
+      <template #header><h2 class="text-lg font-medium">{{ $t('dashboard.recentAssessments') }}</h2></template>
       <el-skeleton v-if="loadingAssessments" :rows="3" animated />
       <template v-else>
-        <div v-if="assessments.length === 0" class="text-sm text-slate-400">No assessments yet.</div>
+        <div v-if="assessments.length === 0" class="text-sm text-slate-400">{{ $t('dashboard.noAssessments') }}</div>
         <div v-for="item in assessments" :key="item.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium truncate">{{ item.inputText || '(recording)' }}</p>

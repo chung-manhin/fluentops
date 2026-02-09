@@ -33,12 +33,15 @@
         ]"
         @click="sidebarOpen = false"
       >
-        {{ item.label }}
+        {{ $t(item.labelKey) }}
       </router-link>
     </nav>
     <div class="border-t px-4 py-4">
       <p class="truncate text-sm text-slate-500">{{ authStore.user?.email }}</p>
-      <button class="mt-2 text-sm text-red-500 hover:text-red-700" @click="handleLogout">Logout</button>
+      <div class="mt-2 flex items-center justify-between">
+        <button class="text-sm text-red-500 hover:text-red-700" @click="handleLogout">{{ $t('nav.logout') }}</button>
+        <button class="text-xs text-slate-400 hover:text-slate-600" @click="handleToggleLocale">{{ $t('nav.lang') }}</button>
+      </div>
     </div>
   </aside>
 
@@ -51,20 +54,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { toggleLocale } from '../i18n';
 
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 const sidebarOpen = ref(false);
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/speaking', label: 'Speaking' },
-  { to: '/coach', label: 'AI Coach' },
-  { to: '/billing', label: 'Billing' },
+  { to: '/dashboard', labelKey: 'nav.dashboard' },
+  { to: '/speaking', labelKey: 'nav.speaking' },
+  { to: '/coach', labelKey: 'nav.coach' },
+  { to: '/billing', labelKey: 'nav.billing' },
 ];
+
+watch(() => route.path, () => {
+  sidebarOpen.value = false;
+});
+
+function handleToggleLocale() {
+  toggleLocale();
+}
 
 async function handleLogout() {
   await authStore.logout();

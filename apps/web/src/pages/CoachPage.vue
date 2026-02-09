@@ -2,26 +2,26 @@
   <main class="mx-auto max-w-4xl px-6 py-10 space-y-6">
     <!-- Input form -->
     <el-card>
-      <template #header><h2 class="text-lg font-medium">Submit Text for Assessment</h2></template>
+      <template #header><h2 class="text-lg font-medium">{{ $t('coach.submitTitle') }}</h2></template>
       <el-input
         v-model="inputText"
         type="textarea"
         :rows="4"
-        placeholder="Type or paste your English text here…"
+        :placeholder="$t('coach.placeholder')"
         :disabled="loading"
       />
       <div class="mt-4 flex items-center gap-3">
         <el-button type="primary" @click="submit" :loading="loading" :disabled="!inputText.trim() || credits <= 0">
-          Assess
+          {{ $t('coach.assess') }}
         </el-button>
-        <span class="text-sm text-gray-500">Credits: {{ credits }}</span>
-        <router-link v-if="credits <= 0" to="/billing" class="text-sm text-blue-500">Buy credits</router-link>
+        <span class="text-sm text-gray-500">{{ $t('coach.credits', { n: credits }) }}</span>
+        <router-link v-if="credits <= 0" to="/billing" class="text-sm text-blue-500">{{ $t('coach.buyCredits') }}</router-link>
       </div>
     </el-card>
 
     <!-- Progress -->
     <el-card v-if="streaming">
-      <template #header><h2 class="text-lg font-medium">Progress</h2></template>
+      <template #header><h2 class="text-lg font-medium">{{ $t('coach.progress') }}</h2></template>
       <el-progress :percentage="progressPct" :status="progressPct === 100 ? 'success' : undefined" />
       <p class="mt-2 text-sm text-gray-500">{{ progressStage }}</p>
     </el-card>
@@ -31,9 +31,9 @@
 
     <!-- Result card -->
     <el-card v-if="result">
-      <template #header><h2 class="text-lg font-medium">Assessment Result</h2></template>
+      <template #header><h2 class="text-lg font-medium">{{ $t('coach.result') }}</h2></template>
 
-      <div v-if="result.rubric" class="grid grid-cols-5 gap-4 mb-6">
+      <div v-if="result.rubric" class="grid grid-cols-3 sm:grid-cols-5 gap-4 mb-6">
         <div v-for="(val, key) in result.rubric" :key="key" class="text-center">
           <el-progress type="circle" :percentage="val" :width="80" />
           <p class="mt-1 text-xs text-gray-500 capitalize">{{ key }}</p>
@@ -41,21 +41,21 @@
       </div>
 
       <div v-if="result.issues?.length" class="mb-4">
-        <h3 class="font-medium mb-2">Issues Found</h3>
+        <h3 class="font-medium mb-2">{{ $t('coach.issues') }}</h3>
         <ul class="list-disc pl-5 space-y-1 text-sm">
           <li v-for="(issue, i) in result.issues" :key="i">{{ issue }}</li>
         </ul>
       </div>
 
       <div v-if="result.rewrites?.length" class="mb-4">
-        <h3 class="font-medium mb-2">Suggested Rewrites</h3>
+        <h3 class="font-medium mb-2">{{ $t('coach.rewrites') }}</h3>
         <ul class="list-decimal pl-5 space-y-1 text-sm">
           <li v-for="(rw, i) in result.rewrites" :key="i">{{ rw }}</li>
         </ul>
       </div>
 
       <div v-if="result.drills?.length" class="mb-4">
-        <h3 class="font-medium mb-2">Practice Drills</h3>
+        <h3 class="font-medium mb-2">{{ $t('coach.drills') }}</h3>
         <ul class="list-decimal pl-5 space-y-1 text-sm">
           <li v-for="(drill, i) in result.drills" :key="i">{{ drill }}</li>
         </ul>
@@ -70,17 +70,17 @@
     <el-card>
       <template #header>
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-medium">Recent Assessments</h2>
-          <el-button size="small" @click="loadHistory" :loading="historyLoading">Refresh</el-button>
+          <h2 class="text-lg font-medium">{{ $t('coach.history') }}</h2>
+          <el-button size="small" @click="loadHistory" :loading="historyLoading">{{ $t('coach.refresh') }}</el-button>
         </div>
       </template>
-      <div v-if="history.length === 0" class="text-gray-400 text-sm">No assessments yet.</div>
+      <div v-if="history.length === 0" class="text-gray-400 text-sm">{{ $t('coach.noHistory') }}</div>
       <div v-for="item in history" :key="item.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
         <div class="min-w-0 flex-1">
           <p class="text-sm font-medium truncate">{{ item.inputText || '(recording)' }}</p>
           <p class="text-xs text-gray-400">{{ new Date(item.createdAt).toLocaleString() }} · {{ item.status }}</p>
         </div>
-        <el-button size="small" @click="viewAssessment(item.id)">View</el-button>
+        <el-button size="small" @click="viewAssessment(item.id)">{{ $t('coach.view') }}</el-button>
       </div>
     </el-card>
   </main>
@@ -88,7 +88,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { http } from '../lib/http';
+
+const { t } = useI18n();
 
 interface AssessResult {
   rubric?: Record<string, number>;
@@ -153,11 +156,11 @@ async function viewAssessment(id: string) {
       streaming.value = false;
       errorMsg.value = '';
     } else if (data.status === 'FAILED') {
-      errorMsg.value = 'Assessment failed';
+      errorMsg.value = t('coach.failed');
       result.value = null;
     }
   } catch {
-    errorMsg.value = 'Failed to load assessment';
+    errorMsg.value = t('coach.loadError');
   }
 }
 
@@ -181,7 +184,7 @@ async function submit() {
     await loadHistory();
     await loadBalance();
   } catch {
-    errorMsg.value = 'Failed to start assessment';
+    errorMsg.value = t('coach.startError');
   } finally {
     loading.value = false;
   }
@@ -196,7 +199,7 @@ async function readSSE(assessmentId: string) {
   });
 
   if (!res.ok || !res.body) {
-    errorMsg.value = 'Failed to connect to SSE stream';
+    errorMsg.value = t('coach.streamError');
     streaming.value = false;
     return;
   }
@@ -236,7 +239,7 @@ async function readSSE(assessmentId: string) {
           result.value = payload;
           streaming.value = false;
         } else if (eventType === 'error') {
-          errorMsg.value = payload.message || 'Assessment failed';
+          errorMsg.value = payload.message || t('coach.failed');
           streaming.value = false;
         }
       } catch {
@@ -253,7 +256,7 @@ async function readSSE(assessmentId: string) {
         result.value = { rubric: data.rubricJson, feedbackMarkdown: data.feedbackMarkdown };
         progressPct.value = 100;
       } else if (data.status === 'FAILED') {
-        errorMsg.value = 'Assessment failed';
+        errorMsg.value = t('coach.failed');
       }
     } catch {
       // ignore
