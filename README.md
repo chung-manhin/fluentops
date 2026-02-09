@@ -87,6 +87,20 @@ LangGraph.js orchestrates a 4-step workflow: diagnose → rewrite → drills →
 
 A provider interface abstracts payment: `mock` for CI/dev (instant fulfillment), `alipay` for sandbox testing (async notify callback). A credit guard checks balance before AI calls.
 
+## Security
+
+- CORS locked to `CORS_ORIGIN` (default `localhost:5173`), `credentials: true`
+- Helmet security headers on all responses
+- Global rate limiting (20 req/min), stricter on login/register (5 req/min)
+- Refresh token rotation is atomic (no TOCTOU race on concurrent refresh)
+- Credit deduction and order fulfillment use interactive Prisma transactions (no double-spend)
+- SSE streams verify assessment ownership before emitting events
+- Upload filenames sanitized against path traversal
+- Alipay notify verifies both signature and `app_id`
+- Error events return generic messages (no stack trace leaks)
+
+See [docs/audit-report.md](docs/audit-report.md) for the full security audit.
+
 ## API Overview
 
 ### Auth
