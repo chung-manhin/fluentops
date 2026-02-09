@@ -20,7 +20,8 @@ Date: 2026-02-09
 | Monorepo builds atomically | Yes — Turborepo `^build` dependency chain |
 | Shared types compile-time contract | Yes — `@fluentops/shared` |
 | CI runs lint + typecheck + build + e2e | Yes — GitHub Actions |
-| CI dependency audit | Added (`pnpm audit --audit-level=high`, advisory) |
+| CI dependency audit | Added (`pnpm audit --audit-level=high`, visible failure with `continue-on-error`) |
+| CI secrets scanning | Added (gitleaks full-history scan on push/PR, blocking) |
 | `.gitignore` covers secrets/dumps | Yes — `*.pem`, `*.key`, `*.cert`, `*.p12`, `*.pfx`, `*.sql`, `*.dump`, `.env.*` |
 | Environment validation | Yes — `class-validator` in `env.validation.ts` |
 
@@ -31,6 +32,24 @@ Date: 2026-02-09
 | Default MinIO creds in `env.validation.ts` | Low | Acceptable for dev defaults; production must override via env |
 | `REFRESH_SECRET` required but unused | Low | Kept for future use (httpOnly cookie signing) |
 | No secrets committed to git history | Pass | Verified via grep |
+
+## C2. Secrets Scanning
+
+CI runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push and PR with full history (`fetch-depth: 0`). Failures block the pipeline.
+
+### Running locally
+
+```bash
+# Install gitleaks (macOS/Linux)
+brew install gitleaks
+# or: go install github.com/gitleaks/gitleaks/v8@latest
+
+# Scan full history
+gitleaks detect --source . -v
+
+# Scan only staged changes
+gitleaks protect --staged -v
+```
 
 ## D. Security Review
 
@@ -62,15 +81,17 @@ Date: 2026-02-09
 
 11. **`.gitignore` hardening**: Added `*.key`, `*.cert`, `*.p12`, `*.pfx`, `*.sql`, `*.dump`, `.env.*` (with `!.env.example`).
 
-12. **CI dependency audit**: Added `pnpm audit --audit-level=high || true` step.
+12. **CI dependency audit**: `pnpm audit --audit-level=high` with `continue-on-error` (visible failure, non-blocking).
+
+13. **CI secrets scanning**: gitleaks full-history scan on every push/PR, blocking on failure.
 
 ### LOW — Documented (acceptable risk or future work)
 
-13. Default MinIO creds in source — dev convenience, overridden in production.
-14. `REFRESH_SECRET` required but unused — reserved for future httpOnly cookie signing.
-15. `localStorage` token storage — documented known risk; httpOnly cookie migration planned.
-16. Docker Compose: no health checks on Redis/MinIO, unauthenticated Redis — dev-only infra.
-17. `pnpm audit`: 2 HIGH transitive vulns (glob via @nestjs/cli, fast-xml-parser via minio) — devDependency / no direct exploit path.
+14. Default MinIO creds in source — dev convenience, overridden in production.
+15. `REFRESH_SECRET` required but unused — reserved for future httpOnly cookie signing.
+16. `localStorage` token storage — documented known risk; httpOnly cookie migration planned.
+17. Docker Compose: no health checks on Redis/MinIO, unauthenticated Redis — dev-only infra.
+18. `pnpm audit`: 2 HIGH transitive vulns (glob via @nestjs/cli, fast-xml-parser via minio) — devDependency / no direct exploit path.
 
 ## E. Pre-Launch Checklist
 
@@ -88,9 +109,10 @@ Date: 2026-02-09
 | 10 | Error message sanitization | Done |
 | 11 | CI dependency audit | Done |
 | 12 | Gitignore hardening | Done |
-| 13 | httpOnly cookie for refresh token | Future — requires frontend refactor |
-| 14 | SECURITY.md with disclosure policy | Future — repo governance decision |
-| 15 | LICENSE file | Future — repo governance decision |
+| 13 | CI secrets scanning (gitleaks) | Done |
+| 14 | httpOnly cookie for refresh token | Future — requires frontend refactor |
+| 15 | SECURITY.md with disclosure policy | Future — repo governance decision |
+| 16 | LICENSE file | Future — repo governance decision |
 | 16 | Redis authentication in docker-compose | Future — infra hardening |
 | 17 | Production Dockerfile with multi-stage build | Future — deployment |
 | 18 | Pin GitHub Actions to SHA | Future — supply chain |
