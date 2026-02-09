@@ -44,16 +44,23 @@ export class AuthService {
 
   async refresh(refreshToken: string) {
     const tokenHash = this.hashToken(refreshToken);
-    // Atomic revoke-or-fail: prevents TOCTOU race on concurrent refresh
-    const { count } = await this.prisma.refreshToken.updateMany({
+    // Step 1: find valid (non-revoked, non-expired) token
+    const stored = await this.prisma.refreshToken.findFirst({
       where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
+      select: { id: true, userId: true },
+    });
+    if (!stored) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+    // Step 2: atomic revoke — only succeeds if still un-revoked (prevents concurrent double-use)
+    const { count } = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
     if (count === 0) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
-    const stored = await this.prisma.refreshToken.findFirst({ where: { tokenHash } });
-    return this.generateTokens(stored!.userId, stored!.id);
+    return this.generateTokens(stored.userId, stored.id);
   }
 
   async logout(refreshToken: string) {
