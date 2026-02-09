@@ -1,5 +1,7 @@
 # FluentOps
 
+[中文文档](README.zh-CN.md)
+
 Full-stack English learning platform — monorepo engineering showcase.
 
 ## Architecture
