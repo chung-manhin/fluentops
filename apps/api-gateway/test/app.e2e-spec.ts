@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma';
 import { MinioService } from './../src/media';
@@ -29,6 +30,8 @@ describe('App (e2e)', () => {
         presignedGetUrl: async () => 'http://localhost:9000/fake-get-url',
         deleteObject: async () => {},
       })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleFixture.createNestApplication();

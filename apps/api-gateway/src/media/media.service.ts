@@ -13,7 +13,8 @@ export class MediaService {
   ) {}
 
   async presign(userId: string, dto: PresignDto) {
-    const objectKey = `recordings/${userId}/${Date.now()}-${dto.filename}`;
+    const safeName = dto.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+    const objectKey = `recordings/${userId}/${Date.now()}-${safeName}`;
     const uploadUrl = await this.minio.presignedPutUrl(objectKey);
     const fileUrl = this.buildFileUrl(objectKey);
     return { uploadUrl, objectKey, fileUrl };

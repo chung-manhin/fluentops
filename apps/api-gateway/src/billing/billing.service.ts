@@ -64,25 +64,25 @@ export class BillingService implements OnModuleInit {
   }
 
   async fulfillOrder(orderId: string, providerTradeNo?: string) {
-    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { plan: true } });
-    if (order.status === 'PAID') return order;
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { plan: true } });
+      if (order.status === 'PAID') return order;
 
-    const credits = order.plan.credits ?? 0;
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.order.update({
+      const credits = order.plan.credits ?? 0;
+      const updated = await tx.order.update({
         where: { id: orderId },
         data: { status: 'PAID', paidAt: new Date(), providerTradeNo: providerTradeNo ?? null },
-      }),
-      this.prisma.userBalance.upsert({
+      });
+      await tx.userBalance.upsert({
         where: { userId: order.userId },
         create: { userId: order.userId, credits },
         update: { credits: { increment: credits } },
-      }),
-      this.prisma.creditLedger.create({
+      });
+      await tx.creditLedger.create({
         data: { userId: order.userId, delta: credits, reason: 'purchase', refId: orderId },
-      }),
-    ]);
-    return updated;
+      });
+      return updated;
+    });
   }
 
   async handleAlipayNotify(params: Record<string, string>): Promise<string> {
@@ -118,9 +118,11 @@ export class BillingService implements OnModuleInit {
   }
 
   async deductCredit(userId: string, reason: string, refId?: string) {
-    await this.prisma.$transaction([
-      this.prisma.userBalance.update({ where: { userId }, data: { credits: { decrement: 1 } } }),
-      this.prisma.creditLedger.create({ data: { userId, delta: -1, reason, refId } }),
-    ]);
+    await this.prisma.$transaction(async (tx) => {
+      const bal = await tx.userBalance.findUnique({ where: { userId } });
+      if (!bal || bal.credits <= 0) throw new BadRequestException('Insufficient credits');
+      await tx.userBalance.update({ where: { userId }, data: { credits: { decrement: 1 } } });
+      await tx.creditLedger.create({ data: { userId, delta: -1, reason, refId } });
+    });
   }
 }
