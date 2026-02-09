@@ -4,11 +4,18 @@ import { ConfigService } from '@nestjs/config';
 import { MediaService } from './media.service';
 import { PrismaService } from '../prisma';
 import { MinioService } from './minio.service';
+import { PresignDto, CompleteUploadDto } from './dto';
 
 describe('MediaService', () => {
   let service: MediaService;
-  let prisma: Record<string, any>;
-  let minio: Record<string, jest.Mock>;
+  let prisma: {
+    recording: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+    };
+  };
+  let minio: { presignedPutUrl: jest.Mock; presignedGetUrl: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -37,15 +44,16 @@ describe('MediaService', () => {
 
   describe('presign', () => {
     it('sanitizes special chars in filename', async () => {
-      const result = await service.presign('u1', { filename: 'héllo wörld!.webm', contentType: 'audio/webm' } as any);
+      const dto = Object.assign(new PresignDto(), { filename: 'héllo wörld!.webm', contentType: 'audio/webm' });
+      const result = await service.presign('u1', dto);
       expect(result.objectKey).toMatch(/^recordings\/u1\/\d+-h_llo_w_rld_.webm$/);
     });
 
     it('truncates filename to 100 chars', async () => {
       const longName = 'a'.repeat(200) + '.webm';
-      const result = await service.presign('u1', { filename: longName, contentType: 'audio/webm' } as any);
+      const dto = Object.assign(new PresignDto(), { filename: longName, contentType: 'audio/webm' });
+      const result = await service.presign('u1', dto);
       const namePart = result.objectKey.split('/').pop()!;
-      // timestamp-name, name part is after the first dash
       const sanitized = namePart.substring(namePart.indexOf('-') + 1);
       expect(sanitized.length).toBeLessThanOrEqual(100);
     });
@@ -53,15 +61,15 @@ describe('MediaService', () => {
 
   describe('complete', () => {
     it('throws ForbiddenException for wrong user prefix', async () => {
-      await expect(
-        service.complete('u1', { objectKey: 'recordings/u2/file.webm', mimeType: 'audio/webm', sizeBytes: 100 } as any),
-      ).rejects.toThrow(ForbiddenException);
+      const dto = Object.assign(new CompleteUploadDto(), { objectKey: 'recordings/u2/file.webm', mimeType: 'audio/webm', sizeBytes: 100 });
+      await expect(service.complete('u1', dto)).rejects.toThrow(ForbiddenException);
     });
 
     it('creates recording on success', async () => {
       const rec = { id: 'r1', objectKey: 'recordings/u1/file.webm', createdAt: new Date() };
       prisma.recording.create.mockResolvedValue(rec);
-      const result = await service.complete('u1', { objectKey: 'recordings/u1/file.webm', mimeType: 'audio/webm', sizeBytes: 100 } as any);
+      const dto = Object.assign(new CompleteUploadDto(), { objectKey: 'recordings/u1/file.webm', mimeType: 'audio/webm', sizeBytes: 100 });
+      const result = await service.complete('u1', dto);
       expect(result.id).toBe('r1');
     });
   });

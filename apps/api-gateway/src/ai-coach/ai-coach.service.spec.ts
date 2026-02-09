@@ -3,10 +3,23 @@ import { ConfigService } from '@nestjs/config';
 import { AICoachService } from './ai-coach.service';
 import { PrismaService } from '../prisma';
 import { BillingService } from '../billing';
+import { AssessDto } from './dto';
 
 describe('AICoachService', () => {
   let service: AICoachService;
-  let prisma: Record<string, any>;
+  let prisma: {
+    assessment: {
+      create: jest.Mock;
+      update: jest.Mock;
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+    };
+    assessmentEvent: {
+      create: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
+    };
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -41,7 +54,8 @@ describe('AICoachService', () => {
       prisma.assessment.update.mockResolvedValue({});
       prisma.assessmentEvent.create.mockResolvedValue({});
 
-      const result = await service.createAssessment('u1', { inputType: 'text', text: 'hello' } as any);
+      const dto = Object.assign(new AssessDto(), { inputType: 'text', text: 'hello' });
+      const result = await service.createAssessment('u1', dto);
       expect(result).toEqual({ assessmentId: 'a1', traceId: 't1' });
       expect(prisma.assessment.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ userId: 'u1', inputType: 'TEXT' }) }),

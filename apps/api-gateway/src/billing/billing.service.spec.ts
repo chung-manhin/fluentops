@@ -7,7 +7,13 @@ import { AlipayService } from './alipay.service';
 
 describe('BillingService', () => {
   let service: BillingService;
-  let prisma: Record<string, any>;
+  let prisma: {
+    plan: { upsert: jest.Mock; findMany: jest.Mock; findUniqueOrThrow: jest.Mock };
+    order: { create: jest.Mock; findFirstOrThrow: jest.Mock; findUniqueOrThrow: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
+    userBalance: { findUnique: jest.Mock; upsert: jest.Mock; updateMany: jest.Mock };
+    creditLedger: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
