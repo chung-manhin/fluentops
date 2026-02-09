@@ -1,60 +1,51 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
-    <header class="border-b bg-white">
-      <div class="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
-        <h1 class="text-lg font-semibold">Speaking Practice</h1>
-        <el-button @click="$router.push('/dashboard')">Dashboard</el-button>
+  <main class="mx-auto max-w-4xl px-6 py-10 space-y-6">
+    <!-- Recorder -->
+    <el-card>
+      <template #header><h2 class="text-lg font-medium">Record</h2></template>
+      <div class="flex items-center gap-4">
+        <el-button
+          v-if="state === 'idle'"
+          type="danger"
+          @click="startRecording"
+          :disabled="uploading"
+        >
+          Start Recording
+        </el-button>
+        <el-button v-if="state === 'recording'" type="warning" @click="pauseRecording">
+          Pause
+        </el-button>
+        <el-button v-if="state === 'paused'" type="success" @click="resumeRecording">
+          Resume
+        </el-button>
+        <el-button v-if="state !== 'idle'" type="info" @click="stopRecording">
+          Stop
+        </el-button>
+        <span v-if="state === 'recording'" class="text-sm text-red-500 animate-pulse">● Recording…</span>
+        <span v-if="state === 'paused'" class="text-sm text-yellow-500">⏸ Paused</span>
+        <span v-if="uploading" class="text-sm text-blue-500">Uploading…</span>
       </div>
-    </header>
+    </el-card>
 
-    <main class="mx-auto max-w-4xl px-6 py-10 space-y-6">
-      <!-- Recorder -->
-      <el-card>
-        <template #header><h2 class="text-lg font-medium">Record</h2></template>
-        <div class="flex items-center gap-4">
-          <el-button
-            v-if="state === 'idle'"
-            type="danger"
-            @click="startRecording"
-            :disabled="uploading"
-          >
-            Start Recording
-          </el-button>
-          <el-button v-if="state === 'recording'" type="warning" @click="pauseRecording">
-            Pause
-          </el-button>
-          <el-button v-if="state === 'paused'" type="success" @click="resumeRecording">
-            Resume
-          </el-button>
-          <el-button v-if="state !== 'idle'" type="info" @click="stopRecording">
-            Stop
-          </el-button>
-          <span v-if="state === 'recording'" class="text-sm text-red-500 animate-pulse">● Recording…</span>
-          <span v-if="state === 'paused'" class="text-sm text-yellow-500">⏸ Paused</span>
-          <span v-if="uploading" class="text-sm text-blue-500">Uploading…</span>
+    <!-- Recordings list -->
+    <el-card>
+      <template #header><h2 class="text-lg font-medium">My Recordings</h2></template>
+      <div v-if="recordings.length === 0" class="text-gray-400 text-sm">No recordings yet.</div>
+      <div v-for="rec in recordings" :key="rec.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
+        <div>
+          <p class="text-sm font-medium">{{ rec.objectKey.split('/').pop() }}</p>
+          <p class="text-xs text-gray-400">{{ new Date(rec.createdAt).toLocaleString() }} · {{ formatBytes(rec.sizeBytes) }}</p>
         </div>
-      </el-card>
+        <el-button size="small" @click="play(rec.id)">Play</el-button>
+      </div>
+    </el-card>
 
-      <!-- Recordings list -->
-      <el-card>
-        <template #header><h2 class="text-lg font-medium">My Recordings</h2></template>
-        <div v-if="recordings.length === 0" class="text-gray-400 text-sm">No recordings yet.</div>
-        <div v-for="rec in recordings" :key="rec.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
-          <div>
-            <p class="text-sm font-medium">{{ rec.objectKey.split('/').pop() }}</p>
-            <p class="text-xs text-gray-400">{{ new Date(rec.createdAt).toLocaleString() }} · {{ formatBytes(rec.sizeBytes) }}</p>
-          </div>
-          <el-button size="small" @click="play(rec.id)">Play</el-button>
-        </div>
-      </el-card>
-
-      <!-- Player -->
-      <el-card v-if="playUrl">
-        <template #header><h2 class="text-lg font-medium">Playback</h2></template>
-        <audio :src="playUrl" controls class="w-full" />
-      </el-card>
-    </main>
-  </div>
+    <!-- Player -->
+    <el-card v-if="playUrl">
+      <template #header><h2 class="text-lg font-medium">Playback</h2></template>
+      <audio :src="playUrl" controls class="w-full" />
+    </el-card>
+  </main>
 </template>
 
 <script setup lang="ts">
