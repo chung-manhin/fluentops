@@ -57,7 +57,11 @@ describe('App (e2e)', () => {
     return request(app.getHttpServer())
       .get('/health')
       .expect(200)
-      .expect({ ok: true });
+      .expect((res) => {
+        expect(res.body.status).toBe('ok');
+        expect(res.body.db).toBe('up');
+        expect(typeof res.body.uptime).toBe('number');
+      });
   });
 
   describe('Auth flow: register -> login -> refresh -> me -> logout', () => {

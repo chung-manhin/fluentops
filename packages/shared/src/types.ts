@@ -1,5 +1,7 @@
 export type HealthResponse = {
-  ok: true;
+  status: 'ok' | 'error';
+  db: 'up' | 'down';
+  uptime: number;
 };
 
 export type AuthTokens = {
