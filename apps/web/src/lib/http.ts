@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import type { AuthTokens } from '@fluentops/shared';
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
@@ -71,7 +72,7 @@ http.interceptors.response.use(
     }
 
     try {
-      const { data } = await axios.post<{ accessToken: string; refreshToken: string }>(
+      const { data } = await axios.post<AuthTokens>(
         `${http.defaults.baseURL}/auth/refresh`,
         { refreshToken },
       );

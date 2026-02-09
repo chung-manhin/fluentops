@@ -1,396 +1,160 @@
-# FluentOps Monorepo
+# FluentOps
 
-This is an enterprise-grade monorepo skeleton for **FluentOps**, an English learning platform.
+Full-stack English learning platform — monorepo engineering showcase.
 
-Planned capabilities include:
-- WebRTC recording
-- AI correction / feedback streaming (SSE)
-- Realtime notifications (WebSocket)
-- Subscription billing
-- Media storage based on MinIO (S3 compatible)
+## Architecture
 
-## Tech stack
+```
+┌─────────────┐    workspace:*    ┌──────────────────┐    workspace:*    ┌─────────────┐
+│  apps/web   │ ◄──────────────── │ packages/shared  │ ────────────────► │ api-gateway │
+│  Vue 3 SPA  │                   │  TypeScript types │                   │   NestJS    │
+└──────┬──────┘                   └──────────────────┘                   └──────┬──────┘
+       │                                                                        │
+       │ Axios + JWT                                              Prisma + JWT  │
+       │                                                                        │
+       └──────────────────────── REST / SSE ────────────────────────────────────┘
+                                     │
+                          ┌──────────┼──────────┐
+                          ▼          ▼          ▼
+                       Postgres    Redis      MinIO
+```
 
-- Monorepo: pnpm workspace + Turborepo
-- Node.js: 20
-- Web: Vue 3 + TypeScript + Vite + Pinia + Vue Router + Axios + Element Plus + TailwindCSS + GSAP
-- API Gateway: NestJS + Prisma + JWT + Jest
-- Database: PostgreSQL
-- Shared: TypeScript `tsc` build (outputs `dist` + `d.ts`)
-- Infra: Docker Compose (Postgres + Redis + MinIO)
+| Decision | Rationale |
+|----------|-----------|
+| Monorepo (pnpm + Turborepo) | Single atomic commits, incremental builds via `turbo ^build` |
+| Shared types package | Compile-time contract between frontend and backend — type drift breaks CI |
+| Dual-token JWT | Short-lived access (15m) + rotating refresh tokens (SHA-256 hashed) |
+| LangGraph.js pipeline | 4-step AI workflow with SSE streaming and sequence-based reconnection |
+| Credit billing | Provider interface (`mock`/`alipay`) — CI-safe mock, production Alipay sandbox |
+| Docker Compose infra | Postgres + Redis + MinIO — one command to spin up all dependencies |
 
-## Repository layout
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Vue 3, Vite 5, Pinia, Vue Router, Axios, Element Plus, Tailwind CSS v4, GSAP |
+| Backend | NestJS, Prisma 5, JWT, Jest |
+| Shared | TypeScript `tsc` build (types + utils) |
+| Infra | Docker Compose, PostgreSQL, Redis, MinIO |
+| CI | GitHub Actions — lint, typecheck, build, e2e |
+| AI | LangGraph.js, OpenAI (with mock provider for CI) |
+
+## Repository Layout
 
 ```
 apps/
-  web/                  # Vue3 frontend
-  api-gateway/          # NestJS backend with auth
+  web/                  # Vue 3 SPA
+  api-gateway/          # NestJS API (auth, media, ai, billing modules)
 packages/
-  shared/               # Shared types/utils
-services/
-  auth/                 # (placeholder)
-  ai-coach/             # (placeholder)
-  media/                # (placeholder)
-  realtime/             # (placeholder)
-  billing/              # (placeholder)
-  worker/               # (placeholder)
+  shared/               # Shared TypeScript types (@fluentops/shared)
 infra/
-  docker-compose.yml
+  docker-compose.yml    # Postgres + Redis + MinIO
+docs/
+  api-reference.md      # Detailed curl examples
+  interview-notes.md    # Technical pitch & Q&A
 .github/
   workflows/ci.yml
 ```
 
-## Getting started
-
-### 1) Install dependencies
+## Quick Start
 
 ```bash
 corepack prepare pnpm@9.15.4 --activate
-corepack pnpm install
-```
-
-### 2) Start infra
-
-```bash
+pnpm install
 docker compose -f infra/docker-compose.yml up -d
+cp apps/api-gateway/.env.example apps/api-gateway/.env  # edit secrets
+cd apps/api-gateway && pnpm prisma migrate dev && cd ../..
+pnpm dev
 ```
 
-### 3) Setup environment
+Web: http://localhost:5173 — API: http://localhost:3000
 
-```bash
-cp .env.example .env
-# Edit .env with your secrets
-```
+## Design Highlights
 
-### 4) Setup database
+### Type-Driven Contract
 
-```bash
-cd apps/api-gateway
-corepack pnpm prisma migrate dev
-```
+`packages/shared` exports types (`AuthTokens`, `UserProfile`, `CreditBalance`, `PlanDto`, `HealthResponse`) imported by both apps. Turborepo's `^build` dependency ensures shared compiles before consumers typecheck. A type change in shared breaks the build immediately if either side drifts.
 
-### 5) Run dev
+### Dual-Token Auth
 
-```bash
-corepack pnpm dev
-```
+Access tokens (15m) are stateless JWTs. Refresh tokens rotate on every use — the old token is revoked and the new one stored as a SHA-256 hash. The frontend Axios interceptor queues concurrent 401 retries behind a single refresh call, preventing race conditions.
 
-- Web: http://localhost:5173
-- API: http://localhost:3000
+### AI Coach Pipeline
 
-## Auth Module
+LangGraph.js orchestrates a 4-step workflow: diagnose → rewrite → drills → score. Results stream via SSE with `id:` sequence numbers for reconnection (`?since=N`). Setting `AI_PROVIDER=mock` swaps in a deterministic mock LLM — the full pipeline runs in CI without API keys.
 
-The API Gateway includes a complete authentication system with dual-token (access + refresh) flow.
+### Credit Billing
 
-### Endpoints
+A provider interface abstracts payment: `mock` for CI/dev (instant fulfillment), `alipay` for sandbox testing (async notify callback). A credit guard checks balance before AI calls.
+
+## API Overview
+
+### Auth
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/auth/register` | Register new user |
-| POST | `/auth/login` | Login, returns tokens |
-| POST | `/auth/refresh` | Refresh tokens (rotation) |
+| POST | `/auth/register` | Register |
+| POST | `/auth/login` | Login → `{accessToken, refreshToken}` |
+| POST | `/auth/refresh` | Rotate tokens |
 | POST | `/auth/logout` | Revoke refresh token |
-| GET | `/me` | Get current user (requires Bearer token) |
+| GET | `/me` | Current user profile |
 
-### curl Examples
-
-```bash
-# Register
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123"}'
-
-# Login
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123"}'
-# Returns: {"accessToken":"...","refreshToken":"..."}
-
-# Get current user
-curl http://localhost:3000/me \
-  -H "Authorization: Bearer <accessToken>"
-
-# Refresh tokens
-curl -X POST http://localhost:3000/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken":"<refreshToken>"}'
-
-# Logout
-curl -X POST http://localhost:3000/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken":"<refreshToken>"}'
-```
-
-### Frontend Auth Flow
-
-The web app implements seamless token refresh:
-- Access token attached to all requests via Axios interceptor
-- On 401, automatically refreshes tokens and retries request
-- Concurrent requests queue during refresh (single refresh call)
-- On refresh failure, redirects to login
-
-### Security Features
-
-- Passwords hashed with bcrypt
-- Refresh tokens stored as SHA-256 hash in database
-- Token rotation on refresh (old token revoked)
-- Logout revokes refresh token
-
-## Recording Module
-
-Audio recording pipeline: WebRTC MediaRecorder → presigned MinIO upload → Postgres metadata → list/playback.
-
-### Endpoints (all require Bearer token)
+### Media
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/media/presign` | Get presigned upload URL |
-| POST | `/media/complete` | Confirm upload, write metadata to DB |
-| GET | `/media` | List current user's recordings |
-| GET | `/media/:id` | Recording detail with signed play URL |
+| POST | `/media/presign` | Presigned upload URL |
+| POST | `/media/complete` | Confirm upload |
+| GET | `/media` | List recordings |
+| GET | `/media/:id` | Detail + signed play URL |
 
-### curl Examples
-
-```bash
-TOKEN="<accessToken>"
-
-# Presign upload
-curl -X POST http://localhost:3000/media/presign \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"filename":"test.webm","contentType":"audio/webm"}'
-# Returns: {"uploadUrl":"...","objectKey":"...","fileUrl":"..."}
-
-# Upload file to presigned URL
-curl -X PUT "<uploadUrl>" \
-  -H "Content-Type: audio/webm" \
-  --data-binary @test.webm
-
-# Complete upload
-curl -X POST http://localhost:3000/media/complete \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"objectKey":"<objectKey>","sizeBytes":12345,"mimeType":"audio/webm","durationMs":5000}'
-# Returns: {"id":"...","url":"...","createdAt":"..."}
-
-# List recordings
-curl http://localhost:3000/media \
-  -H "Authorization: Bearer $TOKEN"
-
-# Get recording detail (with signed play URL)
-curl http://localhost:3000/media/<id> \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Security
-
-- contentType whitelist: `audio/webm`, `audio/wav`, `audio/mpeg`
-- objectKey prefixed with userId for isolation
-- Users can only access their own recordings
-
-## AI Coach Module
-
-AI-powered English assessment: LangGraph 4-step workflow (diagnose → rewrite → drills → score) with SSE streaming.
-
-Requires credits — each assessment costs 1 credit. Buy credits via the Billing module first.
-
-When `AI_PROVIDER=mock` or `OPENAI_API_KEY` is empty, the workflow uses a built-in mock LLM that returns deterministic results — safe for CI and local dev without an API key.
-
-### Endpoints (all require Bearer token)
+### AI Coach
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/ai/assess` | Start assessment (returns assessmentId + SSE URL) |
-| GET | `/ai/assess/:id` | Get assessment result |
-| GET | `/ai/assess/:id/stream` | SSE stream of progress/final events |
-| GET | `/ai/assessments` | List recent assessments (newest first) |
+| POST | `/ai/assess` | Start assessment (costs 1 credit) |
+| GET | `/ai/assess/:id` | Get result |
+| GET | `/ai/assess/:id/stream` | SSE stream |
+| GET | `/ai/assessments` | List recent |
 
-SSE reconnection: pass `?since=<lastSeq>` to resume from a specific event sequence number. Each SSE event includes an `id:` field with the seq number.
-
-### curl Examples
-
-```bash
-TOKEN="<accessToken>"
-
-# Start assessment
-curl -X POST http://localhost:3000/ai/assess \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"inputType":"text","text":"I go to school yesterday and buyed a book"}'
-# Returns: {"assessmentId":"...","traceId":"...","sseUrl":"/ai/assess/.../stream"}
-
-# Get result
-curl http://localhost:3000/ai/assess/<assessmentId> \
-  -H "Authorization: Bearer $TOKEN"
-
-# SSE stream
-curl -N http://localhost:3000/ai/assess/<assessmentId>/stream \
-  -H "Authorization: Bearer $TOKEN"
-
-# SSE reconnect from seq 3
-curl -N "http://localhost:3000/ai/assess/<assessmentId>/stream?since=3" \
-  -H "Authorization: Bearer $TOKEN"
-
-# List recent assessments
-curl http://localhost:3000/ai/assessments \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### SSE Event Format
-
-```
-event: progress
-data: {"stage":"diagnose","pct":5}
-id: 0
-
-event: progress
-data: {"stage":"diagnose","pct":25}
-id: 1
-
-event: final
-data: {"rubric":{"grammar":40,...},"issues":[...],"rewrites":[...],"drills":[...],"feedbackMarkdown":"..."}
-id: 8
-
-event: error
-data: {"message":"..."}
-```
-
-### Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `AI_PROVIDER` | No | — | Set to `mock` to use deterministic mock LLM |
-| `OPENAI_API_KEY` | No | — | OpenAI API key (mock used if empty) |
-| `MODEL_NAME` | No | `gpt-4o-mini` | OpenAI model name |
-| `AI_TEMPERATURE` | No | `0.7` | LLM temperature |
-
-## Billing Module
-
-Credit-based billing: users buy credit packs (mock payment for CI/dev, Alipay sandbox for production). Each AI assessment costs 1 credit.
-
-### Endpoints (all require Bearer token)
+### Billing
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/billing/plans` | List available credit packs |
-| GET | `/billing/balance` | Get current credit balance |
-| POST | `/billing/order` | Create a purchase order (returns `payUrl` when alipay) |
-| POST | `/billing/mock/pay` | Pay order via mock provider (dev/CI only) |
-| POST | `/billing/alipay/notify` | Alipay async notification callback (no auth) |
+| GET | `/billing/plans` | List credit packs |
+| GET | `/billing/balance` | Current balance |
+| POST | `/billing/order` | Create order |
+| POST | `/billing/mock/pay` | Mock payment (dev) |
 
-### curl Examples
-
-```bash
-TOKEN="<accessToken>"
-
-# List plans
-curl http://localhost:3000/billing/plans \
-  -H "Authorization: Bearer $TOKEN"
-
-# Check balance
-curl http://localhost:3000/billing/balance \
-  -H "Authorization: Bearer $TOKEN"
-
-# Create order
-curl -X POST http://localhost:3000/billing/order \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"planId":"<planId>"}'
-
-# Mock pay
-curl -X POST http://localhost:3000/billing/mock/pay \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"orderId":"<orderId>"}'
-```
-
-### Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `BILLING_PROVIDER` | No | `mock` | Payment provider (`mock` or `alipay`) |
-| `ALIPAY_APP_ID` | When alipay | — | Alipay sandbox app ID |
-| `ALIPAY_PRIVATE_KEY` | When alipay | — | App private key (RSA2) |
-| `ALIPAY_PUBLIC_KEY` | When alipay | — | Alipay public key |
-| `ALIPAY_GATEWAY` | No | sandbox URL | Alipay gateway endpoint |
-| `ALIPAY_NOTIFY_URL` | When alipay | — | Public URL for async notifications |
-
-### Mock vs Alipay
-
-| | Mock | Alipay Sandbox |
-|---|---|---|
-| Default | Yes | No |
-| CI safe | Yes | No (needs network) |
-| How it works | `POST /billing/mock/pay` instantly fulfills | `POST /billing/order` returns `payUrl`, user pays on Alipay, notify callback fulfills |
-| Env | `BILLING_PROVIDER=mock` | `BILLING_PROVIDER=alipay` + `ALIPAY_*` vars |
-
-### Alipay Sandbox Testing (local, one-time)
-
-1. Register at [Alipay Open Platform Sandbox](https://open.alipay.com/develop/sandbox/app)
-2. Get sandbox `APPID`, generate RSA2 key pair, set app public key in sandbox console
-3. Configure `.env`:
-   ```
-   BILLING_PROVIDER=alipay
-   ALIPAY_APP_ID=<sandbox-app-id>
-   ALIPAY_PRIVATE_KEY=<your-private-key>
-   ALIPAY_PUBLIC_KEY=<alipay-public-key>
-   ALIPAY_GATEWAY=https://openapi-sandbox.dl.alipaydev.com/gateway.do
-   ALIPAY_NOTIFY_URL=https://<your-ngrok-or-tunnel>/billing/alipay/notify
-   ```
-4. Expose local API via ngrok: `ngrok http 3000`
-5. Start the API: `corepack pnpm dev`
-6. Create order → open `payUrl` in browser → pay with sandbox account
-7. Alipay sends notify to your tunnel → credits added automatically
-8. Common gotchas:
-   - Notify URL must be publicly accessible (use ngrok/cloudflare tunnel)
-   - Sandbox keys are different from production keys
-   - RSA2 (SHA256WithRSA) is required, not RSA1
-   - `checkNotifySign` verifies the callback is authentic
+See [docs/api-reference.md](docs/api-reference.md) for detailed curl examples.
 
 ## Commands
 
 ```bash
-corepack pnpm lint       # ESLint
-corepack pnpm typecheck  # TypeScript check
-corepack pnpm test       # Unit tests
-corepack pnpm build      # Production build
+pnpm lint          # ESLint (all packages)
+pnpm typecheck     # TypeScript check
+pnpm test          # Unit tests
+pnpm build         # Production build
+pnpm dev           # Dev servers (web + api)
 
-# API Gateway specific
+# API Gateway
 cd apps/api-gateway
-corepack pnpm prisma migrate dev   # Run migrations
-corepack pnpm prisma studio        # Open Prisma Studio
-corepack pnpm test:e2e             # E2E tests (requires DB)
+pnpm prisma migrate dev    # Run migrations
+pnpm prisma studio         # Prisma Studio
+pnpm test:e2e              # E2E tests (requires DB)
 ```
 
 ## Environment Variables
 
-See `.env.example` for all required variables:
+See `apps/api-gateway/.env.example` for all variables. Key ones:
 
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Secret for access tokens |
-| `REFRESH_SECRET` | Secret for refresh tokens |
-| `ACCESS_TOKEN_TTL` | Access token TTL (e.g., `15m`) |
-| `REFRESH_TOKEN_TTL` | Refresh token TTL (e.g., `7d`) |
-| `MINIO_ENDPOINT` | MinIO host (e.g., `localhost`) |
-| `MINIO_PORT` | MinIO API port (e.g., `9000`) |
-| `MINIO_ACCESS_KEY` | MinIO access key |
-| `MINIO_SECRET_KEY` | MinIO secret key |
-| `MINIO_BUCKET` | MinIO bucket name |
-| `MINIO_PUBLIC_URL` | Public URL for file access (optional) |
+| `JWT_SECRET` / `REFRESH_SECRET` | Token signing secrets |
+| `MINIO_*` | MinIO connection (endpoint, port, keys, bucket) |
+| `AI_PROVIDER` | `mock` (default) or omit for OpenAI |
+| `OPENAI_API_KEY` | Required when not using mock |
+| `BILLING_PROVIDER` | `mock` (default) or `alipay` |
 
-## FAQ
-
-- **Ports:**
-  - Postgres: 5432
-  - Redis: 6379
-  - MinIO: 9000 (API) / 9001 (Console)
-  - API Gateway: 3000
-  - Web Dev Server: 5173
-
-- **Missing env vars:** API will fail to start with clear error message listing missing variables.
-
-- **Node version:** Requires Node 20. Use `nvm use 20` or similar.
-
-- **pnpm not found:** Run `corepack prepare pnpm@9.15.4 --activate` first.
+Ports: Postgres 5432, Redis 6379, MinIO 9000/9001, API 3000, Web 5173

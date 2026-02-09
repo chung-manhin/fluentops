@@ -47,7 +47,7 @@ export class BillingService implements OnModuleInit {
         order.id,
         plan.name,
         totalAmount,
-        notifyUrl || '',
+        notifyUrl || this.config.get<string>('ALIPAY_NOTIFY_URL') || '',
       );
       return { ...order, payUrl };
     }
@@ -86,6 +86,8 @@ export class BillingService implements OnModuleInit {
   }
 
   async handleAlipayNotify(params: Record<string, string>): Promise<string> {
+    this.logger.log(`Alipay notify received: out_trade_no=${params.out_trade_no} trade_status=${params.trade_status} trade_no=${params.trade_no}`);
+
     if (!this.alipayService.checkNotifySign(params)) {
       this.logger.warn('Alipay notify signature verification failed');
       return 'fail';
@@ -97,7 +99,7 @@ export class BillingService implements OnModuleInit {
 
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) { this.logger.warn(`Alipay notify: order ${orderId} not found`); return 'fail'; }
-    if (order.status === 'PAID') return 'success'; // idempotent
+    if (order.status === 'PAID') { this.logger.log(`Alipay notify: order ${orderId} already paid, skipping`); return 'success'; }
 
     const expectedAmount = (order.amountCents / 100).toFixed(2);
     if (params.total_amount !== expectedAmount) {
@@ -106,6 +108,7 @@ export class BillingService implements OnModuleInit {
     }
 
     await this.fulfillOrder(orderId, params.trade_no);
+    this.logger.log(`Alipay notify: order ${orderId} fulfilled, trade_no=${params.trade_no}`);
     return 'success';
   }
 

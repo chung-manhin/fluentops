@@ -34,6 +34,7 @@
 import { ref } from 'vue';
 import gsap from 'gsap';
 import { http } from '../lib/http';
+import type { HealthResponse } from '@fluentops/shared';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
@@ -53,7 +54,7 @@ function animate() {
 async function checkHealth() {
   loading.value = true;
   try {
-    const { data } = await http.get('/health');
+    const { data } = await http.get<HealthResponse>('/health');
     result.value = JSON.stringify(data);
   } catch (err) {
     result.value = String(err);

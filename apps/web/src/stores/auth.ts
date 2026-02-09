@@ -1,13 +1,9 @@
 import { defineStore } from 'pinia';
 import { http } from '../lib/http';
-
-interface User {
-  id: string;
-  email: string;
-}
+import type { AuthTokens, UserProfile } from '@fluentops/shared';
 
 interface AuthState {
-  user: User | null;
+  user: UserProfile | null;
   accessToken: string | null;
   refreshToken: string | null;
 }
@@ -44,7 +40,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async login(email: string, password: string) {
-      const { data } = await http.post<{ accessToken: string; refreshToken: string }>(
+      const { data } = await http.post<AuthTokens>(
         '/auth/login',
         { email, password },
       );
@@ -54,7 +50,7 @@ export const useAuthStore = defineStore('auth', {
 
     async refresh() {
       if (!this.refreshToken) throw new Error('No refresh token');
-      const { data } = await http.post<{ accessToken: string; refreshToken: string }>(
+      const { data } = await http.post<AuthTokens>(
         '/auth/refresh',
         { refreshToken: this.refreshToken },
       );
@@ -73,7 +69,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async fetchUser() {
-      const { data } = await http.get<User>('/me');
+      const { data } = await http.get<UserProfile>('/me');
       this.user = data;
     },
   },

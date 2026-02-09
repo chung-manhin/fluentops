@@ -31,18 +31,18 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { http } from '../lib/http';
+import type { PlanDto, CreditBalance } from '@fluentops/shared';
 
-interface Plan { id: string; name: string; priceCents: number }
 interface OrderResult { id: string; payUrl?: string }
 
-const plans = ref<Plan[]>([]);
+const plans = ref<PlanDto[]>([]);
 const balance = ref(0);
 const buying = ref('');
 
 async function load() {
   const [p, b] = await Promise.all([
-    http.get<Plan[]>('/billing/plans'),
-    http.get<{ credits: number }>('/billing/balance'),
+    http.get<PlanDto[]>('/billing/plans'),
+    http.get<CreditBalance>('/billing/balance'),
   ]);
   plans.value = p.data;
   balance.value = b.data.credits;

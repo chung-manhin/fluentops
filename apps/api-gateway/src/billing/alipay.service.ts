@@ -35,15 +35,16 @@ export class AlipayService {
 
   async createPagePayUrl(outTradeNo: string, subject: string, totalAmount: string, notifyUrl: string) {
     if (!this.sdk) throw new Error('Alipay SDK not initialized');
-    const url = this.sdk.pageExecute('alipay.trade.page.pay', 'GET', {
+    const opts: Record<string, unknown> = {
       bizContent: {
         out_trade_no: outTradeNo,
         product_code: 'FAST_INSTANT_TRADE_PAY',
         subject,
         total_amount: totalAmount,
       },
-      notifyUrl,
-    });
+    };
+    if (notifyUrl) opts.notifyUrl = notifyUrl;
+    const url = this.sdk.pageExecute('alipay.trade.page.pay', 'GET', opts);
     return url as string;
   }
 
