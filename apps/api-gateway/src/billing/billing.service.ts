@@ -93,6 +93,11 @@ export class BillingService implements OnModuleInit {
       return 'fail';
     }
 
+    if (params.app_id !== this.config.get('ALIPAY_APP_ID')) {
+      this.logger.warn(`Alipay notify: app_id mismatch ${params.app_id}`);
+      return 'fail';
+    }
+
     const orderId = params.out_trade_no;
     const tradeStatus = params.trade_status;
     if (tradeStatus !== 'TRADE_SUCCESS' && tradeStatus !== 'TRADE_FINISHED') return 'success';

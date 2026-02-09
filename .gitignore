@@ -125,6 +125,18 @@ dynamodb_local/
 
 # Private keys
 *.pem
+*.key
+*.cert
+*.p12
+*.pfx
+
+# Database dumps
+*.sql
+*.dump
+
+# Environment files
+.env.*
+!.env.example
 
 # Lock files
 .~lock.*
