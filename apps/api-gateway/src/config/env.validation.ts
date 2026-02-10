@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsString, IsOptional, validateSync } from 'class-validator';
+import { IsString, IsOptional, IsIn, validateSync } from 'class-validator';
 
 class EnvVars {
   @IsString()
@@ -12,6 +12,10 @@ class EnvVars {
   REFRESH_SECRET!: string;
 
   @IsString()
+  @IsIn(['development', 'production', 'test'])
+  NODE_ENV: string = 'development';
+
+  @IsString()
   ACCESS_TOKEN_TTL: string = '15m';
 
   @IsString()
@@ -22,6 +26,9 @@ class EnvVars {
 
   @IsString()
   MINIO_PORT: string = '9000';
+
+  @IsString()
+  MINIO_USE_SSL: string = 'false';
 
   @IsString()
   MINIO_ACCESS_KEY: string = 'minio';
@@ -76,6 +83,10 @@ class EnvVars {
   @IsString()
   @IsOptional()
   ALIPAY_NOTIFY_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  PORT?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -86,6 +97,15 @@ export function validate(config: Record<string, unknown>) {
   if (errors.length > 0) {
     const missing = errors.map((e) => e.property).join(', ');
     throw new Error(`Missing required env vars: ${missing}`);
+  }
+  // Warn about default secrets in production
+  if (validated.NODE_ENV === 'production') {
+    if (validated.JWT_SECRET === 'change-me-jwt' || validated.JWT_SECRET.length < 16) {
+      throw new Error('JWT_SECRET must be changed from default in production');
+    }
+    if (validated.REFRESH_SECRET === 'change-me-refresh' || validated.REFRESH_SECRET.length < 16) {
+      throw new Error('REFRESH_SECRET must be changed from default in production');
+    }
   }
   return validated;
 }

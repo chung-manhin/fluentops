@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -11,6 +11,7 @@ import { MediaModule } from './media';
 import { BillingModule } from './billing';
 import { AICoachModule } from './ai-coach';
 import { validate } from './config/env.validation';
+import { RequestIdMiddleware } from './common/request-id.middleware';
 
 // Safe to read here: ConfigModule.forRoot (below) is synchronous and loads .env
 // before LoggerModule.forRoot processes this value.
@@ -39,4 +40,8 @@ const isProd = process.env['NODE_ENV'] === 'production';
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

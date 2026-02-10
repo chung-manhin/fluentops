@@ -43,7 +43,7 @@
     <!-- Player -->
     <el-card v-if="playUrl">
       <template #header><h2 class="text-lg font-medium">{{ $t('speaking.playback') }}</h2></template>
-      <audio :src="playUrl" controls class="w-full" />
+      <audio :src="playUrl" controls class="w-full" :aria-label="$t('speaking.playback')" />
     </el-card>
   </main>
 </template>

@@ -68,6 +68,7 @@ model Assessment {
   updatedAt        DateTime          @updatedAt
   events           AssessmentEvent[]
   @@index([userId])
+  @@index([userId, createdAt])
 }
 
 model AssessmentEvent {
@@ -148,6 +149,8 @@ model Order {
   createdAt       DateTime    @default(now())
   paidAt          DateTime?
   @@index([userId])
+  @@index([planId])
+  @@index([userId, createdAt])
 }
 
 model CreditLedger {

@@ -12,12 +12,22 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fluentops}
     volumes:
       - pg_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
 
   redis:
     image: redis:7
     container_name: fluentops-redis
     ports:
       - '6379:6379'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
 
   minio:
     image: minio/minio
@@ -31,6 +41,11 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
 
 volumes:
   pg_data:

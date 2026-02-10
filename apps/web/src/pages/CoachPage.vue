@@ -22,7 +22,7 @@
     <!-- Progress -->
     <el-card v-if="streaming">
       <template #header><h2 class="text-lg font-medium">{{ $t('coach.progress') }}</h2></template>
-      <el-progress :percentage="progressPct" :status="progressPct === 100 ? 'success' : undefined" />
+      <el-progress :percentage="progressPct" :status="progressPct === 100 ? 'success' : undefined" aria-label="Assessment progress" />
       <p class="mt-2 text-sm text-gray-500">{{ progressStage }}</p>
     </el-card>
 
@@ -35,7 +35,7 @@
 
       <div v-if="result.rubric" class="grid grid-cols-3 sm:grid-cols-5 gap-4 mb-6">
         <div v-for="(val, key) in result.rubric" :key="key" class="text-center">
-          <el-progress type="circle" :percentage="val" :width="80" />
+          <el-progress type="circle" :percentage="val" :width="80" :aria-label="`${key}: ${val}%`" />
           <p class="mt-1 text-xs text-gray-500 capitalize">{{ key }}</p>
         </div>
       </div>
@@ -196,11 +196,24 @@ async function readSSE(assessmentId: string) {
   const baseUrl = http.defaults.baseURL || 'http://localhost:3000';
   const token = localStorage.getItem('accessToken');
   const sinceParam = lastEventId >= 0 ? `?since=${lastEventId}` : '';
-  const res = await fetch(`${baseUrl}/ai/assess/${assessmentId}/stream${sinceParam}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/ai/assess/${assessmentId}/stream${sinceParam}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+  } catch {
+    clearTimeout(timeout);
+    // Timeout or network error — fall through to poll
+    await pollResult(assessmentId);
+    return;
+  }
 
   if (!res.ok || !res.body) {
+    clearTimeout(timeout);
     errorMsg.value = t('coach.streamError');
     streaming.value = false;
     return;
@@ -210,60 +223,69 @@ async function readSSE(assessmentId: string) {
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      clearTimeout(timeout); // received data, cancel timeout
+      buffer += decoder.decode(value, { stream: true });
 
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop() || '';
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
 
-    for (const part of parts) {
-      const lines = part.split('\n');
-      let eventType = '';
-      let eventData = '';
-      let eventId = '';
-      for (const line of lines) {
-        if (line.startsWith('event: ')) eventType = line.slice(7);
-        else if (line.startsWith('data: ')) eventData = line.slice(6);
-        else if (line.startsWith('id: ')) eventId = line.slice(4);
-      }
-      if (eventId) lastEventId = parseInt(eventId, 10);
-      if (!eventData) continue;
-
-      try {
-        const payload = JSON.parse(eventData);
-        if (eventType === 'progress') {
-          progressPct.value = payload.pct || 0;
-          progressStage.value = payload.stage || '';
-        } else if (eventType === 'final') {
-          progressPct.value = 100;
-          result.value = payload;
-          streaming.value = false;
-        } else if (eventType === 'error') {
-          errorMsg.value = payload.message || t('coach.failed');
-          streaming.value = false;
+      for (const part of parts) {
+        const lines = part.split('\n');
+        let eventType = '';
+        let eventData = '';
+        let eventId = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) eventType = line.slice(7);
+          else if (line.startsWith('data: ')) eventData = line.slice(6);
+          else if (line.startsWith('id: ')) eventId = line.slice(4);
         }
-      } catch (err) {
-        console.warn('Failed to parse SSE event', err);
+        if (eventId) lastEventId = parseInt(eventId, 10);
+        if (!eventData) continue;
+
+        try {
+          const payload = JSON.parse(eventData);
+          if (eventType === 'progress') {
+            progressPct.value = payload.pct || 0;
+            progressStage.value = payload.stage || '';
+          } else if (eventType === 'final') {
+            progressPct.value = 100;
+            result.value = payload;
+            streaming.value = false;
+          } else if (eventType === 'error') {
+            errorMsg.value = payload.message || t('coach.failed');
+            streaming.value = false;
+          }
+        } catch (err) {
+          console.warn('Failed to parse SSE event', err);
+        }
       }
     }
+  } catch {
+    // AbortError or read error — fall through to poll
   }
 
   // If stream ended without final event, poll the result
   if (!result.value && !errorMsg.value) {
-    try {
-      const { data } = await http.get(`/ai/assess/${assessmentId}`);
-      if (data.status === 'SUCCEEDED' && data.rubricJson) {
-        result.value = { rubric: data.rubricJson, feedbackMarkdown: data.feedbackMarkdown };
-        progressPct.value = 100;
-      } else if (data.status === 'FAILED') {
-        errorMsg.value = t('coach.failed');
-      }
-    } catch (err) {
-      console.warn('Failed to poll assessment result', err);
-    }
-    streaming.value = false;
+    await pollResult(assessmentId);
   }
+}
+
+async function pollResult(assessmentId: string) {
+  try {
+    const { data } = await http.get(`/ai/assess/${assessmentId}`);
+    if (data.status === 'SUCCEEDED' && data.rubricJson) {
+      result.value = { rubric: data.rubricJson, feedbackMarkdown: data.feedbackMarkdown };
+      progressPct.value = 100;
+    } else if (data.status === 'FAILED') {
+      errorMsg.value = t('coach.failed');
+    }
+  } catch (err) {
+    console.warn('Failed to poll assessment result', err);
+  }
+  streaming.value = false;
 }
 </script>
