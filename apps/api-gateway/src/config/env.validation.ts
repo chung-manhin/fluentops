@@ -3,13 +3,13 @@ import { IsString, IsOptional, validateSync } from 'class-validator';
 
 class EnvVars {
   @IsString()
-  DATABASE_URL: string;
+  DATABASE_URL!: string;
 
   @IsString()
-  JWT_SECRET: string;
+  JWT_SECRET!: string;
 
   @IsString()
-  REFRESH_SECRET: string;
+  REFRESH_SECRET!: string;
 
   @IsString()
   ACCESS_TOKEN_TTL: string = '15m';

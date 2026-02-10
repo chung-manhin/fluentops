@@ -2,7 +2,7 @@ import { IsString, IsOptional, IsIn, IsArray } from 'class-validator';
 
 export class AssessDto {
   @IsIn(['text', 'recording'])
-  inputType: 'text' | 'recording';
+  inputType!: 'text' | 'recording';
 
   @IsString()
   @IsOptional()

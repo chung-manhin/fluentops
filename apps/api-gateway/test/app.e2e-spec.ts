@@ -189,7 +189,7 @@ describe('App (e2e)', () => {
         .post('/api/v1/media/complete')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({ objectKey, sizeBytes: 12345, mimeType: 'audio/webm', durationMs: 5000 })
-        .expect(200);
+        .expect(201);
 
       expect(res.body).toHaveProperty('id');
       expect(res.body).toHaveProperty('url');

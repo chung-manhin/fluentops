@@ -12,7 +12,9 @@ import { BillingModule } from './billing';
 import { AICoachModule } from './ai-coach';
 import { validate } from './config/env.validation';
 
-const isProd = process.env.NODE_ENV === 'production';
+// Safe to read here: ConfigModule.forRoot (below) is synchronous and loads .env
+// before LoggerModule.forRoot processes this value.
+const isProd = process.env['NODE_ENV'] === 'production';
 
 @Module({
   imports: [

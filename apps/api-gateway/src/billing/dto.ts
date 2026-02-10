@@ -2,10 +2,10 @@ import { IsString } from 'class-validator';
 
 export class CreateOrderDto {
   @IsString()
-  planId: string;
+  planId!: string;
 }
 
 export class MockPayDto {
   @IsString()
-  orderId: string;
+  orderId!: string;
 }

@@ -4,16 +4,16 @@ const ALLOWED_CONTENT_TYPES = ['audio/webm', 'audio/wav', 'audio/mpeg'];
 
 export class PresignDto {
   @IsString()
-  filename: string;
+  filename!: string;
 
   @IsString()
   @IsIn(ALLOWED_CONTENT_TYPES)
-  contentType: string;
+  contentType!: string;
 }
 
 export class CompleteUploadDto {
   @IsString()
-  objectKey: string;
+  objectKey!: string;
 
   @IsInt()
   @IsOptional()
