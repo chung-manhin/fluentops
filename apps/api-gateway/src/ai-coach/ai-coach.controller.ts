@@ -8,17 +8,19 @@ import {
   UseGuards,
   Req,
   Sse,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   HttpException,
   MessageEvent,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from '../billing';
 import { AICoachService } from './ai-coach.service';
 import { AssessDto } from './dto';
+import { AuthenticatedRequest } from '../common/authenticated-request';
 
 @ApiTags('ai-coach')
 @Controller('ai')
@@ -30,33 +32,30 @@ export class AICoachController {
   ) {}
 
   @Post('assess')
-  async assess(@Req() req: Request, @Body() dto: AssessDto) {
-    const userId = (req.user as { id: string }).id;
-    if (!(await this.billingService.hasCredits(userId))) {
+  @HttpCode(HttpStatus.CREATED)
+  async assess(@Req() req: AuthenticatedRequest, @Body() dto: AssessDto) {
+    if (!(await this.billingService.hasCredits(req.user.id))) {
       throw new HttpException('INSUFFICIENT_CREDITS', 402);
     }
-    const result = await this.aiCoachService.createAssessment(userId, dto);
+    const result = await this.aiCoachService.createAssessment(req.user.id, dto);
     return { ...result, sseUrl: `/api/v1/ai/assess/${result.assessmentId}/stream` };
   }
 
   @Get('assessments')
-  listAssessments(@Req() req: Request) {
-    const userId = (req.user as { id: string }).id;
-    return this.aiCoachService.listAssessments(userId);
+  listAssessments(@Req() req: AuthenticatedRequest) {
+    return this.aiCoachService.listAssessments(req.user.id);
   }
 
   @Get('assess/:id')
-  async getAssessment(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as { id: string }).id;
-    const assessment = await this.aiCoachService.getAssessment(userId, id);
+  async getAssessment(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    const assessment = await this.aiCoachService.getAssessment(req.user.id, id);
     if (!assessment) throw new NotFoundException();
     return assessment;
   }
 
   @Sse('assess/:id/stream')
-  stream(@Req() req: Request, @Param('id') id: string, @Query('since') since?: string): Observable<MessageEvent> {
-    const userId = (req.user as { id: string }).id;
+  stream(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Query('since') since?: string): Observable<MessageEvent> {
     const sinceSeq = since ? parseInt(since, 10) : -1;
-    return this.aiCoachService.streamEvents(id, userId, isNaN(sinceSeq) ? -1 : sinceSeq);
+    return this.aiCoachService.streamEvents(id, req.user.id, isNaN(sinceSeq) ? -1 : sinceSeq);
   }
 }

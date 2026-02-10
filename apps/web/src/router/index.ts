@@ -1,14 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import HomePage from '../pages/HomePage.vue';
-import LoginPage from '../pages/LoginPage.vue';
-import RegisterPage from '../pages/RegisterPage.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: HomePage },
-    { path: '/login', name: 'login', component: LoginPage },
-    { path: '/register', name: 'register', component: RegisterPage },
+    { path: '/', name: 'home', component: () => import('../pages/HomePage.vue') },
+    { path: '/login', name: 'login', component: () => import('../pages/LoginPage.vue') },
+    { path: '/register', name: 'register', component: () => import('../pages/RegisterPage.vue') },
     { path: '/dashboard', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta: { requiresAuth: true } },
     { path: '/speaking', name: 'speaking', component: () => import('../pages/SpeakingPage.vue'), meta: { requiresAuth: true } },
     { path: '/coach', name: 'coach', component: () => import('../pages/CoachPage.vue'), meta: { requiresAuth: true } },

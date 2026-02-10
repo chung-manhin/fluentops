@@ -5,10 +5,10 @@ import { PrismaService } from './prisma';
 
 describe('AppController', () => {
   let appController: AppController;
-  let prisma: { $queryRawUnsafe: jest.Mock };
+  let prisma: { $queryRaw: jest.Mock };
 
   beforeEach(async () => {
-    prisma = { $queryRawUnsafe: jest.fn() };
+    prisma = { $queryRaw: jest.fn() };
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [{ provide: PrismaService, useValue: prisma }],
@@ -18,7 +18,7 @@ describe('AppController', () => {
   });
 
   it('GET /health returns ok when DB is up', async () => {
-    prisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
+    prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
     const json = jest.fn();
     const res = { status: jest.fn().mockReturnValue({ json }) } as unknown as Response;
     await appController.health(res);
@@ -27,7 +27,7 @@ describe('AppController', () => {
   });
 
   it('GET /health returns 503 when DB is down', async () => {
-    prisma.$queryRawUnsafe.mockRejectedValue(new Error('connection refused'));
+    prisma.$queryRaw.mockRejectedValue(new Error('connection refused'));
     const json = jest.fn();
     const res = { status: jest.fn().mockReturnValue({ json }) } as unknown as Response;
     await appController.health(res);

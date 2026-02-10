@@ -126,8 +126,8 @@ async function loadBalance() {
   try {
     const { data } = await http.get<{ credits: number }>('/billing/balance');
     credits.value = data.credits;
-  } catch {
-    // ignore
+  } catch (err) {
+    console.warn('Failed to load balance', err);
   }
 }
 
@@ -136,8 +136,8 @@ async function loadHistory() {
   try {
     const { data } = await http.get<HistoryItem[]>('/ai/assessments');
     history.value = data;
-  } catch {
-    // ignore
+  } catch (err) {
+    console.warn('Failed to load assessment history', err);
   } finally {
     historyLoading.value = false;
   }
@@ -159,7 +159,8 @@ async function viewAssessment(id: string) {
       errorMsg.value = t('coach.failed');
       result.value = null;
     }
-  } catch {
+  } catch (err) {
+    console.warn('Failed to load assessment details', err);
     errorMsg.value = t('coach.loadError');
   }
 }
@@ -183,7 +184,8 @@ async function submit() {
     await readSSE(data.assessmentId);
     await loadHistory();
     await loadBalance();
-  } catch {
+  } catch (err) {
+    console.warn('Failed to start assessment', err);
     errorMsg.value = t('coach.startError');
   } finally {
     loading.value = false;
@@ -242,8 +244,8 @@ async function readSSE(assessmentId: string) {
           errorMsg.value = payload.message || t('coach.failed');
           streaming.value = false;
         }
-      } catch {
-        // ignore parse errors
+      } catch (err) {
+        console.warn('Failed to parse SSE event', err);
       }
     }
   }
@@ -258,8 +260,8 @@ async function readSSE(assessmentId: string) {
       } else if (data.status === 'FAILED') {
         errorMsg.value = t('coach.failed');
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn('Failed to poll assessment result', err);
     }
     streaming.value = false;
   }

@@ -98,7 +98,8 @@ export class AICoachService {
       });
 
       await this.billingService.deductCredit(userId, 'ai_assess', assessmentId);
-    } catch {
+    } catch (err) {
+      this.logger.error(`Assessment ${assessmentId} failed`, err instanceof Error ? err.stack : err);
       const count = await this.prisma.assessmentEvent.count({ where: { assessmentId } });
       await this.writeEvent(assessmentId, count, 'ERROR', { message: 'Assessment failed' });
       await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });

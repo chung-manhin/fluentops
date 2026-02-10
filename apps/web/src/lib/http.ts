@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { AuthTokens } from '@fluentops/shared';
+import { router } from '../router';
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
@@ -67,7 +68,7 @@ http.interceptors.response.use(
       // Clear auth and redirect
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
-      window.location.href = '/login';
+      router.push('/login');
       return Promise.reject(error);
     }
 
@@ -88,7 +89,7 @@ http.interceptors.response.use(
       processQueue(refreshError, null);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
-      window.location.href = '/login';
+      router.push('/login');
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

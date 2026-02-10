@@ -1,14 +1,30 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  Res,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
 import { CreateOrderDto, MockPayDto } from './dto';
+import { AuthenticatedRequest } from '../common/authenticated-request';
 
 @ApiTags('billing')
 @Controller('billing')
 export class BillingController {
-  constructor(private billingService: BillingService) {}
+  constructor(
+    private billingService: BillingService,
+    private configService: ConfigService,
+  ) {}
 
   @Get('plans')
   @UseGuards(JwtAuthGuard)
@@ -18,23 +34,24 @@ export class BillingController {
 
   @Get('balance')
   @UseGuards(JwtAuthGuard)
-  getBalance(@Req() req: Request) {
-    const userId = (req.user as { id: string }).id;
-    return this.billingService.getBalance(userId);
+  getBalance(@Req() req: AuthenticatedRequest) {
+    return this.billingService.getBalance(req.user.id);
   }
 
   @Post('order')
   @UseGuards(JwtAuthGuard)
-  createOrder(@Req() req: Request, @Body() dto: CreateOrderDto) {
-    const userId = (req.user as { id: string }).id;
-    return this.billingService.createOrder(userId, dto.planId);
+  @HttpCode(HttpStatus.CREATED)
+  createOrder(@Req() req: AuthenticatedRequest, @Body() dto: CreateOrderDto) {
+    return this.billingService.createOrder(req.user.id, dto.planId);
   }
 
   @Post('mock/pay')
   @UseGuards(JwtAuthGuard)
-  mockPay(@Req() req: Request, @Body() dto: MockPayDto) {
-    const userId = (req.user as { id: string }).id;
-    return this.billingService.mockPay(dto.orderId, userId);
+  mockPay(@Req() req: AuthenticatedRequest, @Body() dto: MockPayDto) {
+    if (this.configService.get<string>('NODE_ENV') === 'production') {
+      throw new NotFoundException();
+    }
+    return this.billingService.mockPay(dto.orderId, req.user.id);
   }
 
   @Post('alipay/notify')

@@ -10,10 +10,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
 import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PresignDto, CompleteUploadDto } from './dto';
+import { AuthenticatedRequest } from '../common/authenticated-request';
 
 @ApiTags('media')
 @Controller('media')
@@ -23,23 +23,23 @@ export class MediaController {
 
   @Post('presign')
   @HttpCode(HttpStatus.OK)
-  presign(@Req() req: Request, @Body() dto: PresignDto) {
-    return this.mediaService.presign((req.user as { id: string }).id, dto);
+  presign(@Req() req: AuthenticatedRequest, @Body() dto: PresignDto) {
+    return this.mediaService.presign(req.user.id, dto);
   }
 
   @Post('complete')
-  @HttpCode(HttpStatus.OK)
-  complete(@Req() req: Request, @Body() dto: CompleteUploadDto) {
-    return this.mediaService.complete((req.user as { id: string }).id, dto);
+  @HttpCode(HttpStatus.CREATED)
+  complete(@Req() req: AuthenticatedRequest, @Body() dto: CompleteUploadDto) {
+    return this.mediaService.complete(req.user.id, dto);
   }
 
   @Get()
-  list(@Req() req: Request) {
-    return this.mediaService.list((req.user as { id: string }).id);
+  list(@Req() req: AuthenticatedRequest) {
+    return this.mediaService.list(req.user.id);
   }
 
   @Get(':id')
-  detail(@Req() req: Request, @Param('id') id: string) {
-    return this.mediaService.detail((req.user as { id: string }).id, id);
+  detail(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.mediaService.detail(req.user.id, id);
   }
 }

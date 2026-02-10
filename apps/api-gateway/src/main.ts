@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as express from 'express';
@@ -9,6 +10,8 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const configService = app.get(ConfigService);
+
   app.useLogger(app.get(Logger));
   app.use(helmet());
   app.use(express.urlencoded({ extended: true }));
@@ -16,11 +19,11 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: configService.get<string>('CORS_ORIGIN', 'http://localhost:5173'),
     credentials: true,
   });
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (configService.get<string>('NODE_ENV') !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('FluentOps API')
       .setVersion('1.0')
@@ -29,7 +32,7 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
   }
 
-  const port = Number(process.env.PORT ?? 3000);
+  const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
 }
 

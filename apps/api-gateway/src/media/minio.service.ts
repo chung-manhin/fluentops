@@ -1,9 +1,10 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
 
 @Injectable()
 export class MinioService implements OnModuleInit {
+  private readonly logger = new Logger(MinioService.name);
   private client: Minio.Client;
   private bucket: string;
 
@@ -24,8 +25,8 @@ export class MinioService implements OnModuleInit {
       if (!exists) {
         await this.client.makeBucket(this.bucket);
       }
-    } catch {
-      // MinIO not available — skip bucket init (e.g. in tests)
+    } catch (err) {
+      this.logger.warn('MinIO not available — skipped bucket init', err instanceof Error ? err.message : err);
     }
   }
 

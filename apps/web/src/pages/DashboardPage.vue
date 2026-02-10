@@ -86,7 +86,8 @@ onMounted(async () => {
   if (!authStore.user && authStore.isAuthenticated) {
     try {
       await authStore.fetchUser();
-    } catch {
+    } catch (err) {
+      console.error('Failed to fetch user profile', err);
       router.push('/login');
       return;
     }

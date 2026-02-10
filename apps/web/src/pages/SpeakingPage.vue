@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, shallowRef, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { http } from '../lib/http';
@@ -69,10 +69,10 @@ const uploading = ref(false);
 const recordings = ref<RecordingItem[]>([]);
 const playUrl = ref<string | null>(null);
 
-let mediaRecorder: MediaRecorder | null = null;
-let stream: MediaStream | null = null;
-let chunks: Blob[] = [];
-let recordStart = 0;
+const mediaRecorder = shallowRef<MediaRecorder | null>(null);
+const stream = shallowRef<MediaStream | null>(null);
+const chunks = shallowRef<Blob[]>([]);
+const recordStart = ref(0);
 
 async function loadRecordings() {
   const { data } = await http.get<RecordingItem[]>('/media');
@@ -83,20 +83,20 @@ onMounted(loadRecordings);
 
 async function startRecording() {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-    chunks = [];
-    recordStart = Date.now();
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
+    stream.value = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder.value = new MediaRecorder(stream.value, { mimeType: 'audio/webm' });
+    chunks.value = [];
+    recordStart.value = Date.now();
+    mediaRecorder.value.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.value.push(e.data);
     };
-    mediaRecorder.onstop = async () => {
-      stream?.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunks, { type: 'audio/webm' });
-      const durationMs = Date.now() - recordStart;
+    mediaRecorder.value.onstop = async () => {
+      stream.value?.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunks.value, { type: 'audio/webm' });
+      const durationMs = Date.now() - recordStart.value;
       await uploadBlob(blob, durationMs);
     };
-    mediaRecorder.start();
+    mediaRecorder.value.start();
     state.value = 'recording';
   } catch {
     ElMessage.error(t('speaking.micDenied'));
@@ -104,17 +104,17 @@ async function startRecording() {
 }
 
 function pauseRecording() {
-  mediaRecorder?.pause();
+  mediaRecorder.value?.pause();
   state.value = 'paused';
 }
 
 function resumeRecording() {
-  mediaRecorder?.resume();
+  mediaRecorder.value?.resume();
   state.value = 'recording';
 }
 
 function stopRecording() {
-  mediaRecorder?.stop();
+  mediaRecorder.value?.stop();
   state.value = 'idle';
 }
 
