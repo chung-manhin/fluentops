@@ -21,6 +21,7 @@ import { BillingService } from '../billing';
 import { AICoachService } from './ai-coach.service';
 import { AssessDto } from './dto';
 import { AuthenticatedRequest } from '../common/authenticated-request';
+import { PaginationDto } from '../common/pagination.dto';
 
 @ApiTags('ai-coach')
 @Controller('ai')
@@ -42,8 +43,8 @@ export class AICoachController {
   }
 
   @Get('assessments')
-  listAssessments(@Req() req: AuthenticatedRequest) {
-    return this.aiCoachService.listAssessments(req.user.id);
+  listAssessments(@Req() req: AuthenticatedRequest, @Query() pagination: PaginationDto) {
+    return this.aiCoachService.listAssessments(req.user.id, pagination);
   }
 
   @Get('assess/:id')

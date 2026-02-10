@@ -1,10 +1,11 @@
-import { IsString, IsOptional, IsIn, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsArray, MaxLength, ArrayMaxSize } from 'class-validator';
 
 export class AssessDto {
   @IsIn(['text', 'recording'])
   inputType!: 'text' | 'recording';
 
   @IsString()
+  @MaxLength(5000)
   @IsOptional()
   text?: string;
 
@@ -14,6 +15,7 @@ export class AssessDto {
 
   @IsArray()
   @IsString({ each: true })
+  @ArrayMaxSize(10)
   @IsOptional()
   goals?: string[];
 }

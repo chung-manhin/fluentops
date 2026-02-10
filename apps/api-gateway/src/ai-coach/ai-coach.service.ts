@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma';
 import { BillingService } from '../billing';
 import { buildGraph, createLLM, runMockWorkflow } from './ai-coach.workflow';
 import { AssessDto } from './dto';
+import { PaginationDto } from '../common/pagination.dto';
 
 const STAGE_PCT: Record<string, [number, number]> = {
   diagnose: [5, 25],
@@ -133,11 +134,12 @@ export class AICoachService {
     });
   }
 
-  async listAssessments(userId: string) {
+  async listAssessments(userId: string, pagination?: PaginationDto) {
     return this.prisma.assessment.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      skip: pagination?.skip ?? 0,
+      take: pagination?.take ?? 20,
       select: {
         id: true,
         status: true,

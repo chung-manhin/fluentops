@@ -40,12 +40,20 @@ export async function runMockWorkflow(
   return MOCK_RESULT;
 }
 
+function safeParse<T>(raw: string): T {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`LLM returned invalid JSON: ${raw.slice(0, 200)}`);
+  }
+}
+
 async function diagnose(state: CoachStateType, llm: LLM): Promise<Partial<CoachStateType>> {
   const res = await llm.invoke([
     { role: 'system', content: 'You are an English language coach. Analyze the following text and return a JSON array of grammar, vocabulary, and expression issues. Each item should be a short string describing the issue. Return ONLY a JSON array.' },
     { role: 'user', content: state.text },
   ]);
-  return { issues: JSON.parse(res.content as string) };
+  return { issues: safeParse<string[]>(res.content as string) };
 }
 
 async function rewrite(state: CoachStateType, llm: LLM): Promise<Partial<CoachStateType>> {
@@ -53,7 +61,7 @@ async function rewrite(state: CoachStateType, llm: LLM): Promise<Partial<CoachSt
     { role: 'system', content: 'You are an English language coach. Given the original text and its issues, provide 2-3 natural rewrites. Return ONLY a JSON array of strings.' },
     { role: 'user', content: `Original: ${state.text}\nIssues: ${JSON.stringify(state.issues)}` },
   ]);
-  return { rewrites: JSON.parse(res.content as string) };
+  return { rewrites: safeParse<string[]>(res.content as string) };
 }
 
 async function drills(state: CoachStateType, llm: LLM): Promise<Partial<CoachStateType>> {
@@ -61,7 +69,7 @@ async function drills(state: CoachStateType, llm: LLM): Promise<Partial<CoachSta
     { role: 'system', content: 'You are an English language coach. Based on the issues found, generate 3 practice exercises. Return ONLY a JSON array of strings, each being a drill/exercise prompt.' },
     { role: 'user', content: `Issues: ${JSON.stringify(state.issues)}` },
   ]);
-  return { drills: JSON.parse(res.content as string) };
+  return { drills: safeParse<string[]>(res.content as string) };
 }
 
 async function score(state: CoachStateType, llm: LLM): Promise<Partial<CoachStateType>> {
@@ -69,7 +77,7 @@ async function score(state: CoachStateType, llm: LLM): Promise<Partial<CoachStat
     { role: 'system', content: 'You are an English language coach. Score the original text on these dimensions (0-100): grammar, vocab, fluency, clarity, naturalness. Also write a short markdown summary. Return ONLY JSON: {"rubric":{"grammar":N,"vocab":N,"fluency":N,"clarity":N,"naturalness":N},"feedback":"...markdown..."}' },
     { role: 'user', content: `Original: ${state.text}\nGoals: ${(state.goals || []).join(', ') || 'general improvement'}` },
   ]);
-  const parsed = JSON.parse(res.content as string);
+  const parsed = safeParse<{ rubric: Record<string, number>; feedback: string }>(res.content as string);
   return { rubric: parsed.rubric, feedback: parsed.feedback };
 }
 

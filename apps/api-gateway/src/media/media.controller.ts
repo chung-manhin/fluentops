@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Body,
+  Query,
   UseGuards,
   Req,
   HttpCode,
@@ -14,6 +15,7 @@ import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PresignDto, CompleteUploadDto } from './dto';
 import { AuthenticatedRequest } from '../common/authenticated-request';
+import { PaginationDto } from '../common/pagination.dto';
 
 @ApiTags('media')
 @Controller('media')
@@ -34,8 +36,8 @@ export class MediaController {
   }
 
   @Get()
-  list(@Req() req: AuthenticatedRequest) {
-    return this.mediaService.list(req.user.id);
+  list(@Req() req: AuthenticatedRequest, @Query() pagination: PaginationDto) {
+    return this.mediaService.list(req.user.id, pagination);
   }
 
   @Get(':id')

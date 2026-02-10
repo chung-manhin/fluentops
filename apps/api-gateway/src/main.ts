@@ -17,7 +17,7 @@ async function bootstrap() {
   app.use(express.urlencoded({ extended: true }));
   app.setGlobalPrefix('api/v1', { exclude: ['health'] });
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({
     origin: configService.get<string>('CORS_ORIGIN', 'http://localhost:5173'),
     credentials: true,

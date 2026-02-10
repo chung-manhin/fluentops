@@ -60,6 +60,7 @@ async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
 
+  form.email = form.email.trim();
   loading.value = true;
   try {
     await authStore.login(form.email, form.password);

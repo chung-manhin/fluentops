@@ -55,7 +55,7 @@ const rules = computed<FormRules>(() => ({
   ],
   password: [
     { required: true, message: t('auth.passwordRequired'), trigger: 'blur' },
-    { min: 6, message: t('auth.passwordMin'), trigger: 'blur' },
+    { min: 8, message: t('auth.passwordMin'), trigger: 'blur' },
   ],
 }));
 
@@ -63,6 +63,7 @@ async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
 
+  form.email = form.email.trim();
   loading.value = true;
   try {
     await authStore.register(form.email, form.password);

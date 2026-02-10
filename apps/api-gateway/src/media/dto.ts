@@ -1,9 +1,10 @@
-import { IsString, IsOptional, IsInt, IsIn } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsIn, MaxLength, Min, Max } from 'class-validator';
 
 const ALLOWED_CONTENT_TYPES = ['audio/webm', 'audio/wav', 'audio/mpeg'];
 
 export class PresignDto {
   @IsString()
+  @MaxLength(255)
   filename!: string;
 
   @IsString()
@@ -13,9 +14,12 @@ export class PresignDto {
 
 export class CompleteUploadDto {
   @IsString()
+  @MaxLength(500)
   objectKey!: string;
 
   @IsInt()
+  @Min(100)
+  @Max(3600000)
   @IsOptional()
   durationMs?: number;
 
@@ -24,6 +28,8 @@ export class CompleteUploadDto {
   mimeType?: string;
 
   @IsInt()
+  @Min(0)
+  @Max(104857600)
   @IsOptional()
   sizeBytes?: number;
 }

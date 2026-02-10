@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import { MinioService } from './minio.service';
 import { PresignDto, CompleteUploadDto } from './dto';
+import { PaginationDto } from '../common/pagination.dto';
 
 @Injectable()
 export class MediaService {
@@ -41,10 +42,12 @@ export class MediaService {
     };
   }
 
-  async list(userId: string) {
+  async list(userId: string, pagination?: PaginationDto) {
     const recordings = await this.prisma.recording.findMany({
       where: { userId, status: 'UPLOADED' },
       orderBy: { createdAt: 'desc' },
+      skip: pagination?.skip ?? 0,
+      take: pagination?.take ?? 20,
     });
     return recordings.map((r) => ({
       ...r,
