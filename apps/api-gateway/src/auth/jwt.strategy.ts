@@ -16,9 +16,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string }) {
+  async validate(payload: { sub: string; email?: string }) {
+    // JWT signature is already verified by Passport — trust the payload.
+    // Only hit DB if the token lacks an email claim (legacy tokens).
+    if (payload.email) {
+      return { id: payload.sub, email: payload.email };
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      select: { id: true, email: true },
     });
     if (!user) {
       throw new UnauthorizedException();

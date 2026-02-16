@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgres:16
     container_name: fluentops-postgres
+    restart: unless-stopped
     ports:
       - '5432:5432'
     environment:
@@ -12,6 +13,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fluentops}
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fluentops}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -21,8 +27,14 @@ services:
   redis:
     image: redis:7
     container_name: fluentops-redis
+    restart: unless-stopped
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -32,6 +44,7 @@ services:
   minio:
     image: minio/minio
     container_name: fluentops-minio
+    restart: unless-stopped
     ports:
       - '9000:9000'
       - '9001:9001'
@@ -41,6 +54,11 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:

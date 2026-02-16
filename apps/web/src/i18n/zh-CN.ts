@@ -71,6 +71,7 @@ export default {
   'speaking.micDenied': '麦克风权限被拒绝',
   'speaking.uploaded': '录音已上传',
   'speaking.uploadFailed': '上传失败，请重试',
+  'speaking.fileTooLarge': '文件过大（最大 100MB）',
 
   // Coach
   'coach.submitTitle': '提交文本进行评估',
@@ -97,6 +98,7 @@ export default {
   'billing.credits': '{n} 积分',
   'billing.packs': '积分包',
   'billing.buy': '购买',
+  'billing.price': '¥{amount}',
   'billing.success': '购买成功！',
   'billing.failed': '购买失败',
 };

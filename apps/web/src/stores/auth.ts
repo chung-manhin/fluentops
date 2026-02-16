@@ -10,7 +10,7 @@ interface AuthState {
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
-    user: null,
+    user: JSON.parse(sessionStorage.getItem('user') || 'null'),
     accessToken: localStorage.getItem('accessToken'),
     refreshToken: localStorage.getItem('refreshToken'),
   }),
@@ -33,6 +33,7 @@ export const useAuthStore = defineStore('auth', {
       this.refreshToken = null;
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('user');
     },
 
     async register(email: string, password: string) {
@@ -71,6 +72,7 @@ export const useAuthStore = defineStore('auth', {
     async fetchUser() {
       const { data } = await http.get<UserProfile>('/me');
       this.user = data;
+      sessionStorage.setItem('user', JSON.stringify(data));
     },
   },
 });

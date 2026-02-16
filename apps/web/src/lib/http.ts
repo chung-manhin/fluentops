@@ -7,22 +7,26 @@ export const http = axios.create({
   timeout: 30000,
 });
 
-let isRefreshing = false;
-let refreshQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (error: unknown) => void;
-}> = [];
+let refreshPromise: Promise<string> | null = null;
 
-const processQueue = (error: unknown, token: string | null) => {
-  refreshQueue.forEach((p) => {
-    if (error) {
-      p.reject(error);
-    } else {
-      p.resolve(token!);
-    }
-  });
-  refreshQueue = [];
-};
+async function doRefresh(): Promise<string> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    router.push('/login');
+    throw new Error('No refresh token');
+  }
+
+  const { data } = await axios.post<AuthTokens>(
+    `${http.defaults.baseURL}/auth/refresh`,
+    { refreshToken },
+  );
+
+  localStorage.setItem('accessToken', data.accessToken);
+  localStorage.setItem('refreshToken', data.refreshToken);
+  return data.accessToken;
+}
 
 // Request interceptor: attach access token
 http.interceptors.request.use((config) => {
@@ -48,52 +52,31 @@ http.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        refreshQueue.push({
-          resolve: (token: string) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            resolve(http(originalRequest));
-          },
-          reject,
-        });
-      });
+    if (refreshPromise) {
+      try {
+        const token = await refreshPromise;
+        originalRequest.headers.Authorization = `Bearer ${token}`;
+        return http(originalRequest);
+      } catch (e) {
+        return Promise.reject(e);
+      }
     }
 
     originalRequest._retry = true;
-    isRefreshing = true;
 
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (!refreshToken) {
-      isRefreshing = false;
-      // Clear auth and redirect
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      router.push('/login');
-      return Promise.reject(error);
-    }
+    refreshPromise = doRefresh();
 
     try {
-      const { data } = await axios.post<AuthTokens>(
-        `${http.defaults.baseURL}/auth/refresh`,
-        { refreshToken },
-      );
-
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-
-      originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-      processQueue(null, data.accessToken);
-
+      const token = await refreshPromise;
+      originalRequest.headers.Authorization = `Bearer ${token}`;
       return http(originalRequest);
     } catch (refreshError) {
-      processQueue(refreshError, null);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       router.push('/login');
       return Promise.reject(refreshError);
     } finally {
-      isRefreshing = false;
+      refreshPromise = null;
     }
   },
 );

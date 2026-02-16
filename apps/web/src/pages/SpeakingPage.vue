@@ -118,7 +118,13 @@ function stopRecording() {
   state.value = 'idle';
 }
 
+const MAX_UPLOAD_SIZE = 100 * 1024 * 1024; // 100MB
+
 async function uploadBlob(blob: Blob, durationMs: number) {
+  if (blob.size > MAX_UPLOAD_SIZE) {
+    ElMessage.error(t('speaking.fileTooLarge'));
+    return;
+  }
   uploading.value = true;
   try {
     const filename = `recording-${Date.now()}.webm`;

@@ -41,4 +41,8 @@ export class MinioService implements OnModuleInit {
   async deleteObject(objectKey: string): Promise<void> {
     await this.client.removeObject(this.bucket, objectKey);
   }
+
+  async statObject(objectKey: string): Promise<Minio.BucketItemStat> {
+    return this.client.statObject(this.bucket, objectKey);
+  }
 }

@@ -266,6 +266,8 @@ async function readSSE(assessmentId: string) {
     }
   } catch {
     // AbortError or read error — fall through to poll
+  } finally {
+    reader.cancel().catch(() => {});
   }
 
   // If stream ended without final event, poll the result
@@ -274,7 +276,9 @@ async function readSSE(assessmentId: string) {
   }
 }
 
-async function pollResult(assessmentId: string) {
+const MAX_POLL_RETRIES = 12;
+
+async function pollResult(assessmentId: string, retries = 0) {
   try {
     const { data } = await http.get(`/ai/assess/${assessmentId}`);
     if (data.status === 'SUCCEEDED' && data.rubricJson) {
@@ -282,9 +286,18 @@ async function pollResult(assessmentId: string) {
       progressPct.value = 100;
     } else if (data.status === 'FAILED') {
       errorMsg.value = t('coach.failed');
+    } else if (retries < MAX_POLL_RETRIES) {
+      setTimeout(() => pollResult(assessmentId, retries + 1), 5000);
+      return; // keep streaming state
+    } else {
+      errorMsg.value = t('coach.failed');
     }
   } catch (err) {
     console.warn('Failed to poll assessment result', err);
+    if (retries < MAX_POLL_RETRIES) {
+      setTimeout(() => pollResult(assessmentId, retries + 1), 5000);
+      return;
+    }
   }
   streaming.value = false;
 }

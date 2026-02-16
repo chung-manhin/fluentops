@@ -2,6 +2,9 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -11,12 +14,37 @@ import { PrismaService } from '../prisma';
 import { RegisterDto, LoginDto } from './dto';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(AuthService.name);
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
     private config: ConfigService,
   ) {}
+
+  onModuleInit() {
+    // Clean up expired refresh tokens every hour
+    this.cleanupTimer = setInterval(() => this.cleanupExpiredTokens(), 60 * 60 * 1000);
+    // Run once on startup
+    this.cleanupExpiredTokens();
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+  }
+
+  private async cleanupExpiredTokens() {
+    try {
+      const { count } = await this.prisma.refreshToken.deleteMany({
+        where: { expiresAt: { lt: new Date() } },
+      });
+      if (count > 0) this.logger.log(`Cleaned up ${count} expired refresh tokens`);
+    } catch (err) {
+      this.logger.warn('Failed to clean up expired tokens', err instanceof Error ? err.message : err);
+    }
+  }
 
   async register(dto: RegisterDto) {
     const exists = await this.prisma.user.findUnique({
@@ -72,8 +100,13 @@ export class AuthService {
   }
 
   private async generateTokens(userId: string, rotatedFromId?: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
     const accessToken = this.jwt.sign(
-      { sub: userId },
+      { sub: user.id, email: user.email },
       {
         secret: this.config.get('JWT_SECRET'),
         expiresIn: this.config.get('ACCESS_TOKEN_TTL') || '15m',

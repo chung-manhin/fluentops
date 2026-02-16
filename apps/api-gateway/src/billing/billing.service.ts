@@ -99,6 +99,10 @@ export class BillingService implements OnModuleInit {
     }
 
     const orderId = params.out_trade_no;
+    if (!orderId || !/^c[a-z0-9]{20,30}$/.test(orderId)) {
+      this.logger.warn(`Alipay notify: invalid out_trade_no format: ${orderId}`);
+      return 'fail';
+    }
     const tradeStatus = params.trade_status;
     if (tradeStatus !== 'TRADE_SUCCESS' && tradeStatus !== 'TRADE_FINISHED') return 'success';
 
@@ -124,6 +128,14 @@ export class BillingService implements OnModuleInit {
 
   async deductCredit(userId: string, reason: string, refId?: string) {
     await this.prisma.$transaction(async (tx) => {
+      // Idempotency check: skip if already deducted for this ref
+      if (refId) {
+        const existing = await tx.creditLedger.findFirst({
+          where: { userId, reason, refId },
+        });
+        if (existing) return;
+      }
+
       // Atomic conditional decrement — fails if credits already 0
       const { count } = await tx.userBalance.updateMany({
         where: { userId, credits: { gt: 0 } },

@@ -106,6 +106,12 @@ export function validate(config: Record<string, unknown>) {
     if (validated.REFRESH_SECRET === 'change-me-refresh' || validated.REFRESH_SECRET.length < 16) {
       throw new Error('REFRESH_SECRET must be changed from default in production');
     }
+    if (validated.MINIO_ACCESS_KEY === 'minio' || validated.MINIO_SECRET_KEY === 'minio123456') {
+      throw new Error('MINIO_ACCESS_KEY and MINIO_SECRET_KEY must be changed from defaults in production');
+    }
+    if (validated.MINIO_ENDPOINT === 'localhost') {
+      throw new Error('MINIO_ENDPOINT must be set explicitly in production');
+    }
   }
   return validated;
 }

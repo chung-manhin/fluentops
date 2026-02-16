@@ -71,6 +71,7 @@ export default {
   'speaking.micDenied': 'Microphone access denied',
   'speaking.uploaded': 'Recording uploaded',
   'speaking.uploadFailed': 'Upload failed, please retry',
+  'speaking.fileTooLarge': 'File is too large (max 100MB)',
 
   // Coach
   'coach.submitTitle': 'Submit Text for Assessment',
@@ -97,6 +98,7 @@ export default {
   'billing.credits': '{n} credits',
   'billing.packs': 'Credit Packs',
   'billing.buy': 'Buy',
+  'billing.price': '${amount}',
   'billing.success': 'Purchase successful!',
   'billing.failed': 'Purchase failed',
 };

@@ -1,7 +1,7 @@
 import { Injectable, Logger, MessageEvent } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Observable, interval, from, EMPTY } from 'rxjs';
-import { switchMap, concatMap, tap, map, takeWhile } from 'rxjs/operators';
+import { Observable, timer, from, EMPTY } from 'rxjs';
+import { switchMap, concatMap, tap, map, takeWhile, expand } from 'rxjs/operators';
 import { PrismaService } from '../prisma';
 import { BillingService } from '../billing';
 import { buildGraph, createLLM, runMockWorkflow } from './ai-coach.workflow';
@@ -14,6 +14,8 @@ const STAGE_PCT: Record<string, [number, number]> = {
   drills: [55, 75],
   score: [80, 95],
 };
+
+const WORKFLOW_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 @Injectable()
 export class AICoachService {
@@ -35,11 +37,37 @@ export class AICoachService {
       },
     });
 
-    this.runWorkflow(assessment.id, userId, dto).catch((err) =>
+    this.runWorkflowWithTimeout(assessment.id, userId, dto).catch((err) =>
       this.logger.error(`Workflow failed for assessment ${assessment.id}`, err?.stack ?? err),
     );
 
     return { assessmentId: assessment.id, traceId: assessment.traceId };
+  }
+
+  private async runWorkflowWithTimeout(assessmentId: string, userId: string, dto: AssessDto) {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Workflow timed out after ${WORKFLOW_TIMEOUT_MS}ms`)), WORKFLOW_TIMEOUT_MS),
+    );
+    try {
+      await Promise.race([this.runWorkflow(assessmentId, userId, dto), timeout]);
+    } catch (err) {
+      // Ensure status is FAILED regardless of where the error originated — use transaction for atomicity
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const assessment = await tx.assessment.findUnique({ where: { id: assessmentId } });
+          if (assessment && assessment.status === 'RUNNING') {
+            const count = await tx.assessmentEvent.count({ where: { assessmentId } });
+            await tx.assessmentEvent.create({
+              data: { assessmentId, seq: count, type: 'ERROR', payloadJson: { message: 'Assessment timed out or failed unexpectedly' } },
+            });
+            await tx.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
+          }
+        });
+      } catch (txErr) {
+        this.logger.error(`Failed to mark assessment ${assessmentId} as FAILED`, txErr instanceof Error ? txErr.stack : txErr);
+      }
+      throw err;
+    }
   }
 
   async runWorkflow(assessmentId: string, userId: string, dto: AssessDto) {
@@ -147,6 +175,7 @@ export class AICoachService {
         inputText: true,
         rubricJson: true,
         createdAt: true,
+        _count: { select: { events: true } },
       },
     });
   }
@@ -154,28 +183,43 @@ export class AICoachService {
   streamEvents(assessmentId: string, userId: string, since = -1): Observable<MessageEvent> {
     let lastSeq = since;
     let verified = false;
-    return interval(500).pipe(
-      switchMap(() => {
-        if (!verified) {
-          return from(
-            this.prisma.assessment.findFirst({ where: { id: assessmentId, userId } }).then((a) => {
-              if (!a) return [];
-              verified = true;
-              return this.prisma.assessmentEvent.findMany({
-                where: { assessmentId, seq: { gt: lastSeq } },
-                orderBy: { seq: 'asc' },
-                take: 50,
-              });
-            }),
-          );
-        }
+    let pollMs = 300; // start fast, back off when idle
+    const MIN_POLL = 300;
+    const MAX_POLL = 3000;
+
+    const fetchEvents = () => {
+      if (!verified) {
         return from(
-          this.prisma.assessmentEvent.findMany({
-            where: { assessmentId, seq: { gt: lastSeq } },
-            orderBy: { seq: 'asc' },
-            take: 50,
+          this.prisma.assessment.findFirst({ where: { id: assessmentId, userId } }).then((a) => {
+            if (!a) return [];
+            verified = true;
+            return this.prisma.assessmentEvent.findMany({
+              where: { assessmentId, seq: { gt: lastSeq } },
+              orderBy: { seq: 'asc' },
+              take: 50,
+            });
           }),
         );
+      }
+      return from(
+        this.prisma.assessmentEvent.findMany({
+          where: { assessmentId, seq: { gt: lastSeq } },
+          orderBy: { seq: 'asc' },
+          take: 50,
+        }),
+      );
+    };
+
+    // Use recursive timer for adaptive polling
+    return timer(0).pipe(
+      expand(() => timer(pollMs)),
+      switchMap(() => fetchEvents()),
+      tap((events) => {
+        if (events.length > 0) {
+          pollMs = MIN_POLL; // reset to fast polling on activity
+        } else {
+          pollMs = Math.min(pollMs * 1.5, MAX_POLL); // back off when idle
+        }
       }),
       concatMap((events) => (events.length ? from(events) : EMPTY)),
       tap((event) => {

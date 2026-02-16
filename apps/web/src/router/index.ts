@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -14,8 +15,8 @@ export const router = createRouter({
 });
 
 router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('accessToken');
-  if (to.meta.requiresAuth && !token) {
+  const authStore = useAuthStore();
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login');
   } else {
     next();

@@ -10,7 +10,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div v-for="plan in plans" :key="plan.id" class="border rounded-lg p-4 flex flex-col items-center gap-3">
           <p class="font-medium">{{ plan.name }}</p>
-          <p class="text-2xl font-bold">${{ (plan.priceCents / 100).toFixed(2) }}</p>
+          <p class="text-2xl font-bold">{{ $t('billing.price', { amount: (plan.priceCents / 100).toFixed(2) }) }}</p>
           <el-button type="primary" :loading="buying === plan.id" @click="buy(plan.id)">{{ $t('billing.buy') }}</el-button>
         </div>
       </div>
@@ -34,12 +34,16 @@ const balance = ref(0);
 const buying = ref('');
 
 async function load() {
-  const [p, b] = await Promise.all([
-    http.get<PlanDto[]>('/billing/plans'),
-    http.get<CreditBalance>('/billing/balance'),
-  ]);
-  plans.value = p.data;
-  balance.value = b.data.credits;
+  try {
+    const [p, b] = await Promise.all([
+      http.get<PlanDto[]>('/billing/plans'),
+      http.get<CreditBalance>('/billing/balance'),
+    ]);
+    plans.value = p.data;
+    balance.value = b.data.credits;
+  } catch {
+    ElMessage.error(t('billing.failed'));
+  }
 }
 
 async function buy(planId: string) {

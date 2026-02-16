@@ -69,6 +69,8 @@ model Assessment {
   events           AssessmentEvent[]
   @@index([userId])
   @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([status])
 }
 
 model AssessmentEvent {
@@ -80,6 +82,7 @@ model AssessmentEvent {
   payloadJson  Json
   createdAt    DateTime            @default(now())
   @@index([assessmentId])
+  @@index([assessmentId, seq])
 }
 
 enum AssessmentInput {
@@ -151,6 +154,8 @@ model Order {
   @@index([userId])
   @@index([planId])
   @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([status])
 }
 
 model CreditLedger {
@@ -162,4 +167,5 @@ model CreditLedger {
   refId     String?
   createdAt DateTime @default(now())
   @@index([userId])
+  @@index([userId, reason, refId])
 }

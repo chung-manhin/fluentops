@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import { MinioService } from './minio.service';
@@ -7,6 +7,9 @@ import { PaginationDto } from '../common/pagination.dto';
 
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
+  private static readonly MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
   constructor(
     private prisma: PrismaService,
     private minio: MinioService,
@@ -35,6 +38,26 @@ export class MediaService {
         status: 'UPLOADED',
       },
     });
+
+    // Verify actual file size from storage
+    try {
+      const stat = await this.minio.statObject(dto.objectKey);
+      if (stat.size > MediaService.MAX_FILE_SIZE) {
+        await this.minio.deleteObject(dto.objectKey);
+        await this.prisma.recording.delete({ where: { id: recording.id } });
+        throw new BadRequestException(`File exceeds maximum size of ${MediaService.MAX_FILE_SIZE} bytes`);
+      }
+      // Update with actual size from storage
+      if (stat.size !== recording.sizeBytes) {
+        await this.prisma.recording.update({
+          where: { id: recording.id },
+          data: { sizeBytes: stat.size },
+        });
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      this.logger.warn(`Could not verify file size for ${dto.objectKey}: ${err instanceof Error ? err.message : err}`);
+    }
     return {
       id: recording.id,
       url: this.buildFileUrl(recording.objectKey),
