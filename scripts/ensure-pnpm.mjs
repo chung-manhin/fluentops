@@ -7,15 +7,27 @@ const __dirname = dirname(__filename);
 
 const repoRoot = join(__dirname, '..');
 const targetDir = join(repoRoot, '.pnpm-bin');
-const targetBin = join(targetDir, 'pnpm');
+const unixBin = join(targetDir, 'pnpm');
+const windowsBin = join(targetDir, 'pnpm.cmd');
+const powershellBin = join(targetDir, 'pnpm.ps1');
 
 mkdirSync(targetDir, { recursive: true });
 
-// Create a simple wrapper that invokes corepack pnpm
-writeFileSync(targetBin, `#!/bin/bash
+// Create simple wrappers that invoke corepack pnpm on each platform.
+writeFileSync(unixBin, `#!/bin/sh
 exec corepack pnpm "$@"
 `);
+writeFileSync(windowsBin, `@echo off\r
+corepack pnpm %*\r
+`);
+writeFileSync(
+  powershellBin,
+  `#!/usr/bin/env pwsh
+corepack pnpm $args
+`,
+);
 
-chmodSync(targetBin, 0o755);
+chmodSync(unixBin, 0o755);
+chmodSync(powershellBin, 0o755);
 
-console.log(`[ensure-pnpm] pnpm wrapper installed to ${targetBin}`);
+console.log(`[ensure-pnpm] pnpm wrappers installed to ${targetDir}`);

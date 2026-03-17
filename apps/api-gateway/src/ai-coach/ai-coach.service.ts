@@ -1,4 +1,9 @@
-import { Injectable, Logger, MessageEvent } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  MessageEvent,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Observable, timer, from, EMPTY } from 'rxjs';
 import { switchMap, concatMap, tap, map, takeWhile, expand } from 'rxjs/operators';
@@ -28,14 +33,30 @@ export class AICoachService {
   ) {}
 
   async createAssessment(userId: string, dto: AssessDto) {
+    if (dto.inputType === 'recording') {
+      throw new BadRequestException('Recording assessments are not supported yet');
+    }
+
     const assessment = await this.prisma.assessment.create({
       data: {
         userId,
         inputType: dto.inputType === 'text' ? 'TEXT' : 'RECORDING',
-        inputText: dto.text,
+        inputText: dto.text?.trim(),
         recordingId: dto.recordingId,
       },
     });
+
+    try {
+      await this.billingService.deductCredit(userId, 'ai_assess', assessment.id);
+    } catch (error) {
+      await this.prisma.assessment.delete({ where: { id: assessment.id } }).catch((deleteError) => {
+        this.logger.error(
+          `Failed to roll back assessment ${assessment.id} after credit reservation error`,
+          deleteError instanceof Error ? deleteError.stack : deleteError,
+        );
+      });
+      throw error;
+    }
 
     this.runWorkflowWithTimeout(assessment.id, userId, dto).catch((err) =>
       this.logger.error(`Workflow failed for assessment ${assessment.id}`, err?.stack ?? err),
@@ -45,9 +66,14 @@ export class AICoachService {
   }
 
   private async runWorkflowWithTimeout(assessmentId: string, userId: string, dto: AssessDto) {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Workflow timed out after ${WORKFLOW_TIMEOUT_MS}ms`)), WORKFLOW_TIMEOUT_MS),
-    );
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new Error(`Workflow timed out after ${WORKFLOW_TIMEOUT_MS}ms`)),
+        WORKFLOW_TIMEOUT_MS,
+      );
+      timeoutHandle.unref?.();
+    });
     try {
       await Promise.race([this.runWorkflow(assessmentId, userId, dto), timeout]);
     } catch (err) {
@@ -63,10 +89,15 @@ export class AICoachService {
             await tx.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
           }
         });
+        await this.billingService.refundCredit(userId, 'ai_assess_refund', assessmentId);
       } catch (txErr) {
         this.logger.error(`Failed to mark assessment ${assessmentId} as FAILED`, txErr instanceof Error ? txErr.stack : txErr);
       }
       throw err;
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
     }
   }
 
@@ -113,25 +144,40 @@ export class AICoachService {
         });
       }
 
-      await this.writeEvent(assessmentId, seq++, 'FINAL', {
+      const current = await this.prisma.assessment.findUnique({
+        where: { id: assessmentId },
+        select: { status: true },
+      });
+      if (!current || current.status !== 'RUNNING') {
+        return;
+      }
+
+      const finalPayload = {
         rubric: result.rubric,
         issues: result.issues,
         rewrites: result.rewrites,
         drills: result.drills,
         feedbackMarkdown: result.feedback,
-      });
+      };
+
+      await this.writeEvent(assessmentId, seq++, 'FINAL', finalPayload);
 
       await this.prisma.assessment.update({
         where: { id: assessmentId },
         data: { status: 'SUCCEEDED', rubricJson: result.rubric, feedbackMarkdown: result.feedback },
       });
-
-      await this.billingService.deductCredit(userId, 'ai_assess', assessmentId);
     } catch (err) {
       this.logger.error(`Assessment ${assessmentId} failed`, err instanceof Error ? err.stack : err);
-      const count = await this.prisma.assessmentEvent.count({ where: { assessmentId } });
-      await this.writeEvent(assessmentId, count, 'ERROR', { message: 'Assessment failed' });
-      await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
+      const current = await this.prisma.assessment.findUnique({
+        where: { id: assessmentId },
+        select: { status: true },
+      });
+      if (current?.status === 'RUNNING') {
+        const count = await this.prisma.assessmentEvent.count({ where: { assessmentId } });
+        await this.writeEvent(assessmentId, count, 'ERROR', { message: 'Assessment failed' });
+        await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
+      }
+      await this.billingService.refundCredit(userId, 'ai_assess_refund', assessmentId);
     }
   }
 
@@ -147,7 +193,7 @@ export class AICoachService {
   }
 
   async getAssessment(userId: string, id: string) {
-    return this.prisma.assessment.findFirst({
+    const assessment = await this.prisma.assessment.findFirst({
       where: { id, userId },
       select: {
         id: true,
@@ -158,8 +204,43 @@ export class AICoachService {
         inputType: true,
         inputText: true,
         createdAt: true,
+        events: {
+          where: { type: 'FINAL' },
+          orderBy: { seq: 'desc' },
+          take: 1,
+          select: { payloadJson: true },
+        },
       },
     });
+
+    if (!assessment) {
+      return null;
+    }
+
+    const finalPayload = assessment.events?.[0]?.payloadJson as
+      | {
+          issues?: string[];
+          rewrites?: string[];
+          drills?: string[];
+          feedbackMarkdown?: string;
+          rubric?: Record<string, number>;
+        }
+      | undefined;
+
+    return {
+      id: assessment.id,
+      status: assessment.status,
+      rubricJson: assessment.rubricJson ?? finalPayload?.rubric ?? null,
+      feedbackMarkdown:
+        assessment.feedbackMarkdown ?? finalPayload?.feedbackMarkdown ?? null,
+      traceId: assessment.traceId,
+      inputType: assessment.inputType,
+      inputText: assessment.inputText,
+      createdAt: assessment.createdAt,
+      issues: finalPayload?.issues ?? [],
+      rewrites: finalPayload?.rewrites ?? [],
+      drills: finalPayload?.drills ?? [],
+    };
   }
 
   async listAssessments(userId: string, pagination?: PaginationDto) {

@@ -18,7 +18,23 @@ router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore();
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login');
-  } else {
-    next();
+    return;
   }
+
+  if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated) {
+    next('/dashboard');
+    return;
+  }
+
+  if (to.meta.requiresAuth && authStore.isAuthenticated && !authStore.user) {
+    authStore.fetchUser()
+      .then(() => next())
+      .catch(async () => {
+        await authStore.logout();
+        next('/login');
+      });
+    return;
+  }
+
+  next();
 });

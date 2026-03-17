@@ -1,7 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma';
@@ -11,11 +11,8 @@ import { MediaModule } from './media';
 import { BillingModule } from './billing';
 import { AICoachModule } from './ai-coach';
 import { validate } from './config/env.validation';
+import { AppThrottlerGuard } from './common/app-throttler.guard';
 import { RequestIdMiddleware } from './common/request-id.middleware';
-
-// Safe to read here: ConfigModule.forRoot (below) is synchronous and loads .env
-// before LoggerModule.forRoot processes this value.
-const isProd = process.env['NODE_ENV'] === 'production';
 
 @Module({
   imports: [
@@ -23,10 +20,16 @@ const isProd = process.env['NODE_ENV'] === 'production';
       isGlobal: true,
       validate,
     }),
-    LoggerModule.forRoot({
-      pinoHttp: {
-        autoLogging: true,
-        ...(isProd ? {} : { transport: { target: 'pino-pretty', options: { singleLine: true } } }),
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const isProd = config.get<string>('NODE_ENV') === 'production';
+        return {
+          pinoHttp: {
+            autoLogging: true,
+            ...(isProd ? {} : { transport: { target: 'pino-pretty', options: { singleLine: true } } }),
+          },
+        };
       },
     }),
     ThrottlerModule.forRoot({ throttlers: [{ ttl: 60000, limit: 20 }] }),
@@ -38,7 +41,10 @@ const isProd = process.env['NODE_ENV'] === 'production';
     AICoachModule,
   ],
   controllers: [AppController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    AppThrottlerGuard,
+    { provide: APP_GUARD, useExisting: AppThrottlerGuard },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

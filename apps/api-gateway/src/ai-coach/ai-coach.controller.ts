@@ -15,6 +15,7 @@ import {
   MessageEvent,
   ParseIntPipe,
   DefaultValuePipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
@@ -44,8 +45,18 @@ export class AICoachController {
     if (!(await this.billingService.hasCredits(req.user.id))) {
       throw new HttpException('INSUFFICIENT_CREDITS', 402);
     }
-    const result = await this.aiCoachService.createAssessment(req.user.id, dto);
-    return { ...result, sseUrl: `/api/v1/ai/assess/${result.assessmentId}/stream` };
+    try {
+      const result = await this.aiCoachService.createAssessment(req.user.id, dto);
+      return { ...result, sseUrl: `/api/v1/ai/assess/${result.assessmentId}/stream` };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException &&
+        error.message === 'Insufficient credits'
+      ) {
+        throw new HttpException('INSUFFICIENT_CREDITS', 402);
+      }
+      throw error;
+    }
   }
 
   @Get('assessments')

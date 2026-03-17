@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@fluentops/shared": "workspace:^",
-    "axios": "^1.13.4",
+    "axios": "^1.13.5",
     "element-plus": "^2.13.2",
     "gsap": "^3.14.2",
     "pinia": "^3.0.4",

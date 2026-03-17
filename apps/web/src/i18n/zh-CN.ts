@@ -8,8 +8,8 @@ export default {
   'nav.lang': 'EN/中',
 
   // Home
-  'home.hero.title': '用 AI 提升英语口语',
-  'home.hero.desc': '录制你的语音，获得语法、流利度和发音的即时 AI 反馈。通过个性化练习更快进步。',
+  'home.hero.title': '用 AI 提升英语表达',
+  'home.hero.desc': '输入文本或录制练习内容，获得语法、流利度、清晰度和下一步练习建议的即时 AI 反馈。',
   'home.hero.getStarted': '立即开始',
   'home.hero.login': '登录',
   'home.hero.dashboard': '进入仪表盘',
@@ -33,7 +33,7 @@ export default {
   'auth.register': '注册',
   'auth.email': '邮箱',
   'auth.password': '密码',
-  'auth.passwordHint': '密码（至少 6 位）',
+  'auth.passwordHint': '密码（至少 8 位，且包含字母和数字）',
   'auth.noAccount': '还没有账号？',
   'auth.hasAccount': '已有账号？',
   'auth.loginFailed': '登录失败',
@@ -42,7 +42,7 @@ export default {
   'auth.emailRequired': '请输入邮箱',
   'auth.emailInvalid': '邮箱格式不正确',
   'auth.passwordRequired': '请输入密码',
-  'auth.passwordMin': '密码至少 6 个字符',
+  'auth.passwordMin': '密码至少 8 位，且需要包含字母和数字',
 
   // Dashboard
   'dashboard.welcome': '欢迎回来，{email}',

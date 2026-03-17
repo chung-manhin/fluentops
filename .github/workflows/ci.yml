@@ -4,9 +4,17 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -51,6 +59,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -99,6 +108,7 @@ jobs:
         run: npx jest --config ./test/jest-e2e.json
         env:
           DATABASE_URL: postgresql://fluentops:fluentops@localhost:5432/fluentops_test
+          E2E_USE_REAL_DB: "true"
           JWT_SECRET: test-jwt-secret
           REFRESH_SECRET: test-refresh-secret
           ACCESS_TOKEN_TTL: 15m

@@ -1,88 +1,191 @@
 <template>
-  <main class="mx-auto max-w-4xl px-6 py-10 space-y-6">
-    <!-- Input form -->
-    <el-card>
-      <template #header><h2 class="text-lg font-medium">{{ $t('coach.submitTitle') }}</h2></template>
-      <el-input
-        v-model="inputText"
-        type="textarea"
-        :rows="4"
-        :placeholder="$t('coach.placeholder')"
-        :disabled="loading"
-      />
-      <div class="mt-4 flex items-center gap-3">
-        <el-button type="primary" @click="submit" :loading="loading" :disabled="!inputText.trim() || credits <= 0">
-          {{ $t('coach.assess') }}
-        </el-button>
-        <span class="text-sm text-gray-500">{{ $t('coach.credits', { n: credits }) }}</span>
-        <router-link v-if="credits <= 0" to="/billing" class="text-sm text-blue-500">{{ $t('coach.buyCredits') }}</router-link>
+  <main class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+    <section class="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
+      <div class="space-y-6">
+        <section class="glass-panel-strong rounded-[2.2rem] p-6 md:p-7">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p class="section-kicker">{{ $t('nav.coach') }}</p>
+              <h1 class="mt-2 text-3xl font-semibold text-[var(--page-ink)]">{{ $t('coach.submitTitle') }}</h1>
+            </div>
+            <div class="rounded-full border border-black/8 bg-white/75 px-4 py-2 text-sm font-semibold text-[var(--page-ink)]">
+              {{ $t('coach.credits', { n: credits }) }}
+            </div>
+          </div>
+
+          <div class="mt-6 rounded-[1.8rem] border border-black/8 bg-white/82 p-4">
+            <el-input
+              v-model="inputText"
+              type="textarea"
+              :rows="8"
+              :placeholder="$t('coach.placeholder')"
+              :disabled="loading"
+            />
+          </div>
+
+          <div class="mt-5 flex flex-wrap items-center gap-3">
+            <el-button
+              type="primary"
+              class="!rounded-full !border-0 !bg-[var(--page-ink)] !px-6 !py-3 !text-sm !font-semibold"
+              @click="submit"
+              :loading="loading"
+              :disabled="!inputText.trim() || credits <= 0"
+            >
+              {{ $t('coach.assess') }}
+            </el-button>
+            <router-link
+              v-if="credits <= 0"
+              to="/billing"
+              class="rounded-full border border-black/10 bg-white/70 px-5 py-3 text-sm font-semibold text-[var(--page-ink)] hover:bg-white"
+            >
+              {{ $t('coach.buyCredits') }}
+            </router-link>
+          </div>
+        </section>
+
+        <section class="glass-panel rounded-[2.2rem] p-6">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="section-kicker">{{ $t('coach.history') }}</p>
+              <h2 class="mt-2 text-2xl font-semibold text-[var(--page-ink)]">{{ $t('coach.history') }}</h2>
+            </div>
+            <el-button
+              size="small"
+              class="!rounded-full"
+              @click="loadHistory"
+              :loading="historyLoading"
+            >
+              {{ $t('coach.refresh') }}
+            </el-button>
+          </div>
+
+          <div v-if="history.length === 0" class="mt-6 rounded-[1.5rem] border border-dashed border-black/10 bg-white/65 p-6 text-sm text-[var(--soft-ink)]">
+            {{ $t('coach.noHistory') }}
+          </div>
+
+          <div v-else class="mt-6 space-y-4">
+            <div
+              v-for="item in history"
+              :key="item.id"
+              class="rounded-[1.5rem] border border-black/8 bg-white/78 p-4"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-semibold text-[var(--page-ink)]">
+                    {{ item.inputText || '(recording)' }}
+                  </p>
+                  <p class="mt-2 text-xs uppercase tracking-[0.2em] text-[var(--soft-ink)]">
+                    {{ new Date(item.createdAt).toLocaleString() }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span
+                    :class="[
+                      'rounded-full px-3 py-1 text-xs font-semibold',
+                      item.status === 'SUCCEEDED'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : item.status === 'FAILED'
+                          ? 'bg-rose-100 text-rose-700'
+                          : 'bg-amber-100 text-amber-700',
+                    ]"
+                  >
+                    {{ item.status }}
+                  </span>
+                  <el-button size="small" class="!rounded-full" @click="viewAssessment(item.id)">
+                    {{ $t('coach.view') }}
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-    </el-card>
 
-    <!-- Progress -->
-    <el-card v-if="streaming">
-      <template #header><h2 class="text-lg font-medium">{{ $t('coach.progress') }}</h2></template>
-      <el-progress :percentage="progressPct" :status="progressPct === 100 ? 'success' : undefined" aria-label="Assessment progress" />
-      <p class="mt-2 text-sm text-gray-500">{{ progressStage }}</p>
-    </el-card>
+      <div class="space-y-6 xl:sticky xl:top-8 xl:self-start">
+        <section v-if="streaming" class="glass-panel-strong rounded-[2.2rem] p-6">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="section-kicker">{{ $t('coach.progress') }}</p>
+              <h2 class="mt-2 text-2xl font-semibold text-[var(--page-ink)]">{{ $t('coach.progress') }}</h2>
+            </div>
+            <div class="signal-bars flex items-end gap-1.5">
+              <span style="height: 14px;" />
+              <span style="height: 30px;" />
+              <span style="height: 18px;" />
+              <span style="height: 24px;" />
+            </div>
+          </div>
+          <el-progress
+            class="mt-6"
+            :percentage="progressPct"
+            :status="progressPct === 100 ? 'success' : undefined"
+            aria-label="Assessment progress"
+          />
+          <p class="mt-3 text-sm text-[var(--muted-ink)]">{{ progressStage }}</p>
+        </section>
 
-    <!-- Error -->
-    <el-alert v-if="errorMsg" type="error" :title="errorMsg" show-icon class="mb-4" />
+        <el-alert v-if="errorMsg" type="error" :title="errorMsg" show-icon class="mb-4" />
 
-    <!-- Result card -->
-    <el-card v-if="result">
-      <template #header><h2 class="text-lg font-medium">{{ $t('coach.result') }}</h2></template>
+        <section v-if="result" class="glass-panel-strong rounded-[2.2rem] p-6">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="section-kicker">{{ $t('coach.result') }}</p>
+              <h2 class="mt-2 text-2xl font-semibold text-[var(--page-ink)]">{{ $t('coach.result') }}</h2>
+            </div>
+            <span class="rounded-full bg-[rgba(15,118,110,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+              {{ $t('nav.coach') }}
+            </span>
+          </div>
 
-      <div v-if="result.rubric" class="grid grid-cols-3 sm:grid-cols-5 gap-4 mb-6">
-        <div v-for="(val, key) in result.rubric" :key="key" class="text-center">
-          <el-progress type="circle" :percentage="val" :width="80" :aria-label="`${key}: ${val}%`" />
-          <p class="mt-1 text-xs text-gray-500 capitalize">{{ key }}</p>
-        </div>
+          <div v-if="result.rubric" class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div
+              v-for="(val, key) in result.rubric"
+              :key="key"
+              class="rounded-[1.4rem] border border-black/8 bg-white/78 p-4 text-center"
+            >
+              <el-progress type="circle" :percentage="val" :width="76" :aria-label="`${key}: ${val}%`" />
+              <p class="mt-3 text-xs font-semibold capitalize tracking-[0.16em] text-[var(--soft-ink)]">{{ key }}</p>
+            </div>
+          </div>
+
+          <div v-if="result.issues?.length" class="mt-6 rounded-[1.6rem] border border-black/8 bg-white/78 p-5">
+            <h3 class="font-semibold text-[var(--page-ink)]">{{ $t('coach.issues') }}</h3>
+            <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-[var(--muted-ink)]">
+              <li v-for="(issue, i) in result.issues" :key="i">{{ issue }}</li>
+            </ul>
+          </div>
+
+          <div v-if="result.rewrites?.length" class="mt-4 rounded-[1.6rem] border border-black/8 bg-white/78 p-5">
+            <h3 class="font-semibold text-[var(--page-ink)]">{{ $t('coach.rewrites') }}</h3>
+            <ul class="mt-3 list-decimal space-y-2 pl-5 text-sm text-[var(--muted-ink)]">
+              <li v-for="(rw, i) in result.rewrites" :key="i">{{ rw }}</li>
+            </ul>
+          </div>
+
+          <div v-if="result.drills?.length" class="mt-4 rounded-[1.6rem] border border-black/8 bg-white/78 p-5">
+            <h3 class="font-semibold text-[var(--page-ink)]">{{ $t('coach.drills') }}</h3>
+            <ul class="mt-3 list-decimal space-y-2 pl-5 text-sm text-[var(--muted-ink)]">
+              <li v-for="(drill, i) in result.drills" :key="i">{{ drill }}</li>
+            </ul>
+          </div>
+
+          <div
+            v-if="result.feedbackMarkdown"
+            class="mt-4 rounded-[1.6rem] border border-black/8 bg-[rgba(15,118,110,0.06)] p-5 text-sm leading-7 text-[var(--page-ink)] whitespace-pre-wrap"
+          >
+            {{ result.feedbackMarkdown }}
+          </div>
+        </section>
+
+        <section v-else class="glass-panel rounded-[2.2rem] p-6">
+          <p class="section-kicker">{{ $t('coach.result') }}</p>
+          <h2 class="mt-2 text-2xl font-semibold text-[var(--page-ink)]">{{ $t('coach.result') }}</h2>
+          <div class="mt-6 rounded-[1.8rem] border border-dashed border-black/10 bg-white/62 p-8 text-sm leading-7 text-[var(--soft-ink)]">
+            {{ $t('home.steps.analyzeDesc') }}
+          </div>
+        </section>
       </div>
-
-      <div v-if="result.issues?.length" class="mb-4">
-        <h3 class="font-medium mb-2">{{ $t('coach.issues') }}</h3>
-        <ul class="list-disc pl-5 space-y-1 text-sm">
-          <li v-for="(issue, i) in result.issues" :key="i">{{ issue }}</li>
-        </ul>
-      </div>
-
-      <div v-if="result.rewrites?.length" class="mb-4">
-        <h3 class="font-medium mb-2">{{ $t('coach.rewrites') }}</h3>
-        <ul class="list-decimal pl-5 space-y-1 text-sm">
-          <li v-for="(rw, i) in result.rewrites" :key="i">{{ rw }}</li>
-        </ul>
-      </div>
-
-      <div v-if="result.drills?.length" class="mb-4">
-        <h3 class="font-medium mb-2">{{ $t('coach.drills') }}</h3>
-        <ul class="list-decimal pl-5 space-y-1 text-sm">
-          <li v-for="(drill, i) in result.drills" :key="i">{{ drill }}</li>
-        </ul>
-      </div>
-
-      <div v-if="result.feedbackMarkdown" class="mt-4 p-4 bg-gray-50 rounded text-sm whitespace-pre-wrap">
-        {{ result.feedbackMarkdown }}
-      </div>
-    </el-card>
-
-    <!-- History -->
-    <el-card>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-medium">{{ $t('coach.history') }}</h2>
-          <el-button size="small" @click="loadHistory" :loading="historyLoading">{{ $t('coach.refresh') }}</el-button>
-        </div>
-      </template>
-      <div v-if="history.length === 0" class="text-gray-400 text-sm">{{ $t('coach.noHistory') }}</div>
-      <div v-for="item in history" :key="item.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium truncate">{{ item.inputText || '(recording)' }}</p>
-          <p class="text-xs text-gray-400">{{ new Date(item.createdAt).toLocaleString() }} · {{ item.status }}</p>
-        </div>
-        <el-button size="small" @click="viewAssessment(item.id)">{{ $t('coach.view') }}</el-button>
-      </div>
-    </el-card>
+    </section>
   </main>
 </template>
 
@@ -150,9 +253,22 @@ onMounted(() => {
 
 async function viewAssessment(id: string) {
   try {
-    const { data } = await http.get(`/ai/assess/${id}`);
+    const { data } = await http.get<{
+      status: string;
+      rubricJson: Record<string, number> | null;
+      feedbackMarkdown: string | null;
+      issues?: string[];
+      rewrites?: string[];
+      drills?: string[];
+    }>(`/ai/assess/${id}`);
     if (data.status === 'SUCCEEDED') {
-      result.value = { rubric: data.rubricJson, feedbackMarkdown: data.feedbackMarkdown };
+      result.value = {
+        rubric: data.rubricJson ?? undefined,
+        feedbackMarkdown: data.feedbackMarkdown ?? undefined,
+        issues: data.issues,
+        rewrites: data.rewrites,
+        drills: data.drills,
+      };
       streaming.value = false;
       errorMsg.value = '';
     } else if (data.status === 'FAILED') {
@@ -207,7 +323,6 @@ async function readSSE(assessmentId: string) {
     });
   } catch {
     clearTimeout(timeout);
-    // Timeout or network error — fall through to poll
     await pollResult(assessmentId);
     return;
   }
@@ -227,7 +342,7 @@ async function readSSE(assessmentId: string) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      clearTimeout(timeout); // received data, cancel timeout
+      clearTimeout(timeout);
       buffer += decoder.decode(value, { stream: true });
 
       const parts = buffer.split('\n\n');
@@ -265,12 +380,11 @@ async function readSSE(assessmentId: string) {
       }
     }
   } catch {
-    // AbortError or read error — fall through to poll
+    // fall through to polling
   } finally {
     reader.cancel().catch(() => {});
   }
 
-  // If stream ended without final event, poll the result
   if (!result.value && !errorMsg.value) {
     await pollResult(assessmentId);
   }
@@ -280,15 +394,28 @@ const MAX_POLL_RETRIES = 12;
 
 async function pollResult(assessmentId: string, retries = 0) {
   try {
-    const { data } = await http.get(`/ai/assess/${assessmentId}`);
+    const { data } = await http.get<{
+      status: string;
+      rubricJson: Record<string, number> | null;
+      feedbackMarkdown: string | null;
+      issues?: string[];
+      rewrites?: string[];
+      drills?: string[];
+    }>(`/ai/assess/${assessmentId}`);
     if (data.status === 'SUCCEEDED' && data.rubricJson) {
-      result.value = { rubric: data.rubricJson, feedbackMarkdown: data.feedbackMarkdown };
+      result.value = {
+        rubric: data.rubricJson,
+        feedbackMarkdown: data.feedbackMarkdown ?? undefined,
+        issues: data.issues,
+        rewrites: data.rewrites,
+        drills: data.drills,
+      };
       progressPct.value = 100;
     } else if (data.status === 'FAILED') {
       errorMsg.value = t('coach.failed');
     } else if (retries < MAX_POLL_RETRIES) {
       setTimeout(() => pollResult(assessmentId, retries + 1), 5000);
-      return; // keep streaming state
+      return;
     } else {
       errorMsg.value = t('coach.failed');
     }

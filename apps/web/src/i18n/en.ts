@@ -8,8 +8,8 @@ export default {
   'nav.lang': 'EN/中',
 
   // Home
-  'home.hero.title': 'Master English Speaking with AI',
-  'home.hero.desc': 'Record yourself, get instant AI-powered feedback on grammar, fluency, and pronunciation. Improve faster with personalized drills.',
+  'home.hero.title': 'Build Better English with AI',
+  'home.hero.desc': 'Write or record your practice, then get instant AI feedback on grammar, fluency, clarity, and next-step drills.',
   'home.hero.getStarted': 'Get Started',
   'home.hero.login': 'Login',
   'home.hero.dashboard': 'Go to Dashboard',
@@ -33,7 +33,7 @@ export default {
   'auth.register': 'Register',
   'auth.email': 'Email',
   'auth.password': 'Password',
-  'auth.passwordHint': 'Password (min 6 chars)',
+  'auth.passwordHint': 'Password (8+ chars, letters and numbers)',
   'auth.noAccount': "Don't have an account?",
   'auth.hasAccount': 'Already have an account?',
   'auth.loginFailed': 'Login failed',
@@ -42,7 +42,7 @@ export default {
   'auth.emailRequired': 'Email is required',
   'auth.emailInvalid': 'Invalid email',
   'auth.passwordRequired': 'Password is required',
-  'auth.passwordMin': 'Password must be at least 6 characters',
+  'auth.passwordMin': 'Password must be at least 8 characters and include letters and numbers',
 
   // Dashboard
   'dashboard.welcome': 'Welcome back, {email}',

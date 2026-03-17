@@ -60,6 +60,9 @@ export type AssessmentDto = {
   inputText: string | null;
   rubricJson: Record<string, number> | null;
   feedbackMarkdown: string | null;
+  issues?: string[];
+  rewrites?: string[];
+  drills?: string[];
   createdAt: string;
 };
 

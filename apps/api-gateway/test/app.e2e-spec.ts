@@ -1,14 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import * as request from 'supertest';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma';
 import { MinioService } from './../src/media';
+import { createInMemoryPrisma } from './in-memory-prisma';
+
+jest.setTimeout(30000);
 
 describe('App (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  const useRealDb = process.env['E2E_USE_REAL_DB'] === 'true';
+  const inMemoryPrisma = useRealDb ? null : createInMemoryPrisma();
 
   const userA = {
     email: `test-a-${Date.now()}@example.com`,
@@ -20,7 +25,7 @@ describe('App (e2e)', () => {
   };
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(MinioService)
@@ -29,10 +34,16 @@ describe('App (e2e)', () => {
         presignedPutUrl: async () => 'http://localhost:9000/fake-put-url',
         presignedGetUrl: async () => 'http://localhost:9000/fake-get-url',
         deleteObject: async () => {},
+        statObject: async () => ({ size: 12345 }),
       })
-      .overrideGuard(ThrottlerGuard)
-      .useValue({ canActivate: () => true })
-      .compile();
+      .overrideProvider(APP_GUARD)
+      .useValue({ canActivate: () => true });
+
+    if (inMemoryPrisma) {
+      moduleBuilder.overrideProvider(PrismaService).useValue(inMemoryPrisma as unknown as PrismaService);
+    }
+
+    const moduleFixture: TestingModule = await moduleBuilder.compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1', { exclude: ['health'] });
@@ -43,14 +54,19 @@ describe('App (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.assessmentEvent.deleteMany({ where: { assessment: { user: { email: { in: [userA.email, userB.email] } } } } });
-    await prisma.assessment.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
-    await prisma.creditLedger.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
-    await prisma.order.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
-    await prisma.userBalance.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
-    await prisma.recording.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
-    await prisma.user.deleteMany({ where: { email: { in: [userA.email, userB.email] } } });
-    await app.close();
+    if (prisma && useRealDb) {
+      await prisma.assessmentEvent.deleteMany({ where: { assessment: { user: { email: { in: [userA.email, userB.email] } } } } });
+      await prisma.assessment.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+      await prisma.creditLedger.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+      await prisma.order.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+      await prisma.userBalance.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+      await prisma.recording.deleteMany({ where: { user: { email: { in: [userA.email, userB.email] } } } });
+      await prisma.user.deleteMany({ where: { email: { in: [userA.email, userB.email] } } });
+    }
+    inMemoryPrisma?.reset();
+    if (app) {
+      await app.close();
+    }
   });
 
   it('/health (GET)', () => {

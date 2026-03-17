@@ -7,18 +7,22 @@ import { AssessDto } from './dto';
 
 describe('AICoachService', () => {
   let service: AICoachService;
+  let billingService: { deductCredit: jest.Mock; refundCredit: jest.Mock };
   let prisma: {
     assessment: {
       create: jest.Mock;
       update: jest.Mock;
       findFirst: jest.Mock;
       findMany: jest.Mock;
+      findUnique: jest.Mock;
+      delete: jest.Mock;
     };
     assessmentEvent: {
       create: jest.Mock;
       count: jest.Mock;
       findMany: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -28,12 +32,19 @@ describe('AICoachService', () => {
         update: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
       },
       assessmentEvent: {
         create: jest.fn(),
         count: jest.fn(),
         findMany: jest.fn(),
       },
+      $transaction: jest.fn((fn) => fn(prisma)),
+    };
+    billingService = {
+      deductCredit: jest.fn(),
+      refundCredit: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -41,11 +52,12 @@ describe('AICoachService', () => {
         AICoachService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: () => 'mock' } },
-        { provide: BillingService, useValue: { deductCredit: jest.fn() } },
+        { provide: BillingService, useValue: billingService },
       ],
     }).compile();
 
     service = module.get(AICoachService);
+    jest.spyOn(service as unknown as { runWorkflowWithTimeout: () => Promise<void> }, 'runWorkflowWithTimeout').mockResolvedValue(undefined);
   });
 
   describe('createAssessment', () => {
@@ -75,7 +87,7 @@ describe('AICoachService', () => {
 
   describe('getAssessment', () => {
     it('scopes query by userId', async () => {
-      prisma.assessment.findFirst.mockResolvedValue({ id: 'a1' });
+      prisma.assessment.findFirst.mockResolvedValue({ id: 'a1', events: [] });
       await service.getAssessment('u1', 'a1');
       expect(prisma.assessment.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'a1', userId: 'u1' } }),

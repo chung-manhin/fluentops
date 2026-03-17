@@ -6,12 +6,29 @@
   "engines": {
     "node": "20"
   },
+  "pnpm": {
+    "overrides": {
+      "fast-xml-parser": "4.5.4",
+      "glob": "10.5.0",
+      "minimatch@3.1.2": "3.1.4",
+      "minimatch@3.1.3": "3.1.4",
+      "minimatch@9.0.1": "9.0.7",
+      "minimatch@9.0.5": "9.0.7",
+      "minimatch@9.0.6": "9.0.7",
+      "rollup": "4.59.0",
+      "multer": "2.1.1",
+      "flatted": "3.4.0",
+      "serialize-javascript": "7.0.3",
+      "undici": "7.24.0"
+    }
+  },
   "scripts": {
-    "dev": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run dev --parallel",
-    "lint": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run lint",
-    "typecheck": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run typecheck",
-    "test": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run test",
-    "build": "node ./scripts/ensure-pnpm.mjs && PNPM_HOME=$PWD/.pnpm-bin PATH=$PNPM_HOME:$PATH turbo run build",
+    "dev": "node ./scripts/run-turbo.mjs dev --parallel",
+    "lint": "node ./scripts/run-turbo.mjs lint",
+    "typecheck": "node ./scripts/run-turbo.mjs typecheck",
+    "test": "node ./scripts/run-turbo.mjs test",
+    "build": "node ./scripts/run-turbo.mjs build",
+    "audit": "pnpm audit --audit-level=high",
     "format": "prettier . --check",
     "format:write": "prettier . --write"
   },

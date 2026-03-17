@@ -145,4 +145,22 @@ export class BillingService implements OnModuleInit {
       await tx.creditLedger.create({ data: { userId, delta: -1, reason, refId } });
     });
   }
+
+  async refundCredit(userId: string, reason: string, refId?: string) {
+    await this.prisma.$transaction(async (tx) => {
+      if (refId) {
+        const existing = await tx.creditLedger.findFirst({
+          where: { userId, reason, refId },
+        });
+        if (existing) return;
+      }
+
+      await tx.userBalance.upsert({
+        where: { userId },
+        create: { userId, credits: 1 },
+        update: { credits: { increment: 1 } },
+      });
+      await tx.creditLedger.create({ data: { userId, delta: 1, reason, refId } });
+    });
+  }
 }

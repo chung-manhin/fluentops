@@ -122,6 +122,7 @@ dynamodb_local/
 # Editors
 .vscode/
 .idea/
+.claude/
 
 # Private keys
 *.pem

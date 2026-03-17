@@ -27,6 +27,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     // Clean up expired refresh tokens every hour
     this.cleanupTimer = setInterval(() => this.cleanupExpiredTokens(), 60 * 60 * 1000);
+    this.cleanupTimer.unref?.();
     // Run once on startup
     this.cleanupExpiredTokens();
   }

@@ -1,34 +1,78 @@
 <template>
-  <div class="min-h-screen flex">
-    <!-- Branding panel (hidden on mobile) -->
-    <div class="hidden md:flex md:w-1/2 bg-gradient-to-br from-indigo-600 to-indigo-800 items-center justify-center">
-      <div class="text-center text-white px-10">
-        <h1 class="text-4xl font-bold">FluentOps</h1>
-        <p class="mt-4 text-lg text-indigo-200">{{ $t('home.hero.desc') }}</p>
-      </div>
-    </div>
-    <!-- Form panel -->
-    <div class="flex flex-1 items-center justify-center bg-slate-50 px-6">
-      <div class="w-full max-w-md">
-        <h2 class="text-2xl font-bold text-slate-900 text-center mb-6">{{ $t('auth.login') }}</h2>
-        <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="handleSubmit">
-          <el-form-item prop="email">
-            <el-input v-model="form.email" :placeholder="$t('auth.email')" type="email" size="large" />
-          </el-form-item>
-          <el-form-item prop="password">
-            <el-input v-model="form.password" :placeholder="$t('auth.password')" type="password" show-password size="large" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" native-type="submit" :loading="loading" class="w-full" size="large">
-              {{ $t('auth.login') }}
-            </el-button>
-          </el-form-item>
-        </el-form>
-        <div class="text-center text-sm text-slate-500">
-          {{ $t('auth.noAccount') }}
-          <router-link to="/register" class="text-indigo-600 hover:text-indigo-700 font-medium">{{ $t('auth.register') }}</router-link>
+  <div class="page-shell min-h-screen px-4 py-6 sm:px-6">
+    <div class="mx-auto grid min-h-[calc(100vh-3rem)] max-w-6xl gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <section class="glass-panel-strong flex flex-col justify-between rounded-[2.4rem] p-8 md:p-10">
+        <div>
+          <div class="flex items-center justify-between gap-3">
+            <router-link to="/" class="flex items-center gap-3">
+              <div class="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--page-ink)] text-xs font-bold tracking-[0.24em] text-white">
+                FO
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-[0.28em] text-[var(--muted-ink)]">FluentOps</p>
+                <p class="text-sm text-[var(--soft-ink)]">{{ $t('nav.coach') }}</p>
+              </div>
+            </router-link>
+          </div>
+
+          <p class="section-kicker mt-10">{{ $t('auth.login') }}</p>
+          <h1 class="mt-3 text-4xl font-semibold leading-tight text-[var(--page-ink)] md:text-5xl">
+            {{ $t('home.hero.title') }}
+          </h1>
+          <p class="mt-5 max-w-xl text-sm leading-8 text-[var(--muted-ink)] md:text-base">
+            {{ $t('home.hero.desc') }}
+          </p>
         </div>
-      </div>
+
+        <div class="mt-10 grid gap-4 md:grid-cols-3">
+          <div class="rounded-[1.6rem] border border-black/8 bg-white/76 p-4">
+            <p class="text-xs uppercase tracking-[0.2em] text-[var(--soft-ink)]">{{ $t('nav.speaking') }}</p>
+            <p class="mt-3 text-sm leading-7 text-[var(--muted-ink)]">{{ $t('home.features.speakingDesc') }}</p>
+          </div>
+          <div class="rounded-[1.6rem] border border-black/8 bg-white/76 p-4">
+            <p class="text-xs uppercase tracking-[0.2em] text-[var(--soft-ink)]">{{ $t('nav.coach') }}</p>
+            <p class="mt-3 text-sm leading-7 text-[var(--muted-ink)]">{{ $t('home.features.coachDesc') }}</p>
+          </div>
+          <div class="rounded-[1.6rem] border border-black/8 bg-white/76 p-4">
+            <p class="text-xs uppercase tracking-[0.2em] text-[var(--soft-ink)]">{{ $t('nav.billing') }}</p>
+            <p class="mt-3 text-sm leading-7 text-[var(--muted-ink)]">{{ $t('home.features.creditsDesc') }}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-panel rounded-[2.4rem] p-8 md:p-10">
+        <div class="mx-auto max-w-md">
+          <p class="section-kicker">{{ $t('auth.login') }}</p>
+          <h2 class="mt-3 text-3xl font-semibold text-[var(--page-ink)]">{{ $t('auth.login') }}</h2>
+
+          <el-form ref="formRef" :model="form" :rules="rules" class="mt-8 space-y-2" @submit.prevent="handleSubmit">
+            <el-form-item prop="email">
+              <el-input v-model="form.email" :placeholder="$t('auth.email')" type="email" size="large" />
+            </el-form-item>
+            <el-form-item prop="password">
+              <el-input v-model="form.password" :placeholder="$t('auth.password')" type="password" show-password size="large" />
+            </el-form-item>
+            <el-form-item class="!mb-0">
+              <el-button
+                type="primary"
+                native-type="submit"
+                :loading="loading"
+                class="!mt-3 !w-full !rounded-full !border-0 !bg-[var(--page-ink)] !py-3 !text-sm !font-semibold"
+                size="large"
+              >
+                {{ $t('auth.login') }}
+              </el-button>
+            </el-form-item>
+          </el-form>
+
+          <div class="mt-6 text-center text-sm text-[var(--muted-ink)]">
+            {{ $t('auth.noAccount') }}
+            <router-link to="/register" class="font-semibold text-[var(--accent)] hover:text-[#0d695f]">
+              {{ $t('auth.register') }}
+            </router-link>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>

@@ -15,7 +15,12 @@ describe('MediaService', () => {
       findFirst: jest.Mock;
     };
   };
-  let minio: { presignedPutUrl: jest.Mock; presignedGetUrl: jest.Mock };
+  let minio: {
+    presignedPutUrl: jest.Mock;
+    presignedGetUrl: jest.Mock;
+    statObject: jest.Mock;
+    deleteObject: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -28,6 +33,8 @@ describe('MediaService', () => {
     minio = {
       presignedPutUrl: jest.fn().mockResolvedValue('http://minio/put'),
       presignedGetUrl: jest.fn().mockResolvedValue('http://minio/get'),
+      statObject: jest.fn().mockResolvedValue({ size: 100 }),
+      deleteObject: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -71,6 +78,18 @@ describe('MediaService', () => {
       const dto = Object.assign(new CompleteUploadDto(), { objectKey: 'recordings/u1/file.webm', mimeType: 'audio/webm', sizeBytes: 100 });
       const result = await service.complete('u1', dto);
       expect(result.id).toBe('r1');
+      expect(prisma.recording.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sizeBytes: 100 }),
+        }),
+      );
+    });
+
+    it('throws when uploaded object does not exist', async () => {
+      minio.statObject.mockRejectedValueOnce(new Error('not found'));
+      const dto = Object.assign(new CompleteUploadDto(), { objectKey: 'recordings/u1/file.webm', mimeType: 'audio/webm', sizeBytes: 100 });
+      await expect(service.complete('u1', dto)).rejects.toThrow('Uploaded file not found');
+      expect(prisma.recording.create).not.toHaveBeenCalled();
     });
   });
 

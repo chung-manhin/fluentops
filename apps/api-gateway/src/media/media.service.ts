@@ -28,36 +28,35 @@ export class MediaService {
     if (!dto.objectKey.startsWith(`recordings/${userId}/`)) {
       throw new ForbiddenException('Object key does not belong to user');
     }
+
+    let stat;
+    try {
+      stat = await this.minio.statObject(dto.objectKey);
+    } catch (err) {
+      this.logger.warn(`Could not stat uploaded object ${dto.objectKey}: ${err instanceof Error ? err.message : err}`);
+      throw new BadRequestException('Uploaded file not found');
+    }
+
+    if (stat.size > MediaService.MAX_FILE_SIZE) {
+      try {
+        await this.minio.deleteObject(dto.objectKey);
+      } catch (deleteErr) {
+        this.logger.warn(`Failed to remove oversized object ${dto.objectKey}: ${deleteErr instanceof Error ? deleteErr.message : deleteErr}`);
+      }
+      throw new BadRequestException(`File exceeds maximum size of ${MediaService.MAX_FILE_SIZE} bytes`);
+    }
+
     const recording = await this.prisma.recording.create({
       data: {
         userId,
         objectKey: dto.objectKey,
         mimeType: dto.mimeType || 'audio/webm',
-        sizeBytes: dto.sizeBytes ?? 0,
+        sizeBytes: stat.size,
         durationMs: dto.durationMs,
         status: 'UPLOADED',
       },
     });
 
-    // Verify actual file size from storage
-    try {
-      const stat = await this.minio.statObject(dto.objectKey);
-      if (stat.size > MediaService.MAX_FILE_SIZE) {
-        await this.minio.deleteObject(dto.objectKey);
-        await this.prisma.recording.delete({ where: { id: recording.id } });
-        throw new BadRequestException(`File exceeds maximum size of ${MediaService.MAX_FILE_SIZE} bytes`);
-      }
-      // Update with actual size from storage
-      if (stat.size !== recording.sizeBytes) {
-        await this.prisma.recording.update({
-          where: { id: recording.id },
-          data: { sizeBytes: stat.size },
-        });
-      }
-    } catch (err) {
-      if (err instanceof BadRequestException) throw err;
-      this.logger.warn(`Could not verify file size for ${dto.objectKey}: ${err instanceof Error ? err.message : err}`);
-    }
     return {
       id: recording.id,
       url: this.buildFileUrl(recording.objectKey),

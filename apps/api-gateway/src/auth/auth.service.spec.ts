@@ -7,7 +7,11 @@ import { PrismaService } from '../prisma';
 
 describe('AuthService', () => {
   let service: AuthService;
+  let moduleRef: TestingModule;
   let prisma: {
+    user: {
+      findUniqueOrThrow: jest.Mock;
+    };
     refreshToken: {
       findFirst: jest.Mock;
       updateMany: jest.Mock;
@@ -17,6 +21,9 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     prisma = {
+      user: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'user-1', email: 'u1@example.com' }),
+      },
       refreshToken: {
         findFirst: jest.fn(),
         updateMany: jest.fn(),
@@ -24,7 +31,7 @@ describe('AuthService', () => {
       },
     };
 
-    const module: TestingModule = await Test.createTestingModule({
+    moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
@@ -33,7 +40,11 @@ describe('AuthService', () => {
       ],
     }).compile();
 
-    service = module.get(AuthService);
+    service = moduleRef.get(AuthService);
+  });
+
+  afterEach(async () => {
+    await moduleRef.close();
   });
 
   describe('refresh — concurrent use', () => {

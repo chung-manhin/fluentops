@@ -2,7 +2,7 @@
 
 [中文文档](README.zh-CN.md)
 
-Full-stack English learning platform — monorepo engineering showcase.
+Full-stack English learning platform — product-ready monorepo.
 
 ## Architecture
 
@@ -58,18 +58,51 @@ docs/
   workflows/ci.yml
 ```
 
+## User Flows
+
+- Register -> login -> refresh -> logout
+- Load current user state on protected routes
+- Record audio -> upload to MinIO -> replay recording
+- Submit text -> stream AI assessment progress via SSE -> revisit history
+- Check credits -> create order -> mock pay -> consume credits on assessment
+- Handle empty, loading, and failure states across the core pages
+
 ## Quick Start
+
+Prerequisites:
+
+- Node.js 20.x
+- Corepack enabled
+- Docker Desktop (for Postgres, Redis, MinIO)
 
 ```bash
 corepack prepare pnpm@9.15.4 --activate
 pnpm install
 docker compose -f infra/docker-compose.yml up -d
-cp apps/api-gateway/.env.example apps/api-gateway/.env  # edit secrets
+```
+
+Create the API env file:
+
+```bash
+cp apps/api-gateway/.env.example apps/api-gateway/.env
+```
+
+PowerShell:
+
+```powershell
+Copy-Item apps/api-gateway/.env.example apps/api-gateway/.env
+```
+
+Run migrations and start the workspace:
+
+```bash
 cd apps/api-gateway && pnpm prisma migrate dev && cd ../..
 pnpm dev
 ```
 
 Web: http://localhost:5173 — API: http://localhost:3000
+
+Root workspace commands (`pnpm dev`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`) are now cross-platform and work in PowerShell as well as bash.
 
 ## Design Highlights
 
@@ -88,6 +121,17 @@ LangGraph.js orchestrates a 4-step workflow: diagnose → rewrite → drills →
 ### Credit Billing
 
 A provider interface abstracts payment: `mock` for CI/dev (instant fulfillment), `alipay` for sandbox testing (async notify callback). A credit guard checks balance before AI calls.
+
+## Recent Hardening
+
+- Cross-platform Turborepo scripts for Windows PowerShell and bash
+- Local e2e runs now default to an in-memory Prisma test adapter, while CI keeps real PostgreSQL coverage
+- Atomic credit reservation before AI execution, plus idempotent refund on workflow failure
+- Media uploads now verify the object exists before creating a recording row
+- Assessment detail responses now include streamed drill / rewrite / issue data
+- Global throttling now uses an initialization-safe guard, avoiding intermittent auth 500s during startup
+- Stronger password guidance and route-level auth bootstrap on the frontend
+- Dependency risk reduced via direct upgrades and `pnpm.overrides`
 
 ## Security
 
@@ -152,12 +196,14 @@ pnpm typecheck     # TypeScript check
 pnpm test          # Unit tests
 pnpm build         # Production build
 pnpm dev           # Dev servers (web + api)
+pnpm audit         # Dependency audit (expect only low/moderate findings after overrides)
 
 # API Gateway
 cd apps/api-gateway
 pnpm prisma migrate dev    # Run migrations
 pnpm prisma studio         # Prisma Studio
-pnpm test:e2e              # E2E tests (requires DB)
+pnpm test:e2e              # E2E tests (local in-memory mode by default)
+E2E_USE_REAL_DB=true pnpm test:e2e   # Opt into the real PostgreSQL-backed flow
 ```
 
 ## Environment Variables
@@ -174,3 +220,9 @@ See `apps/api-gateway/.env.example` for all variables. Key ones:
 | `BILLING_PROVIDER` | `mock` (default) or `alipay` |
 
 Ports: Postgres 5432, Redis 6379, MinIO 9000/9001, API 3000, Web 5173
+
+## Troubleshooting
+
+- `docker` command not found: install Docker Desktop or provide your own Postgres / Redis / MinIO endpoints in `apps/api-gateway/.env`.
+- `pnpm dev` fails with a Node warning: the workspace expects Node 20.x. Node 22 may work locally, but CI and the repo contract are pinned to Node 20.
+- `pnpm test:e2e` now uses an in-memory Prisma adapter locally, so it should run without Docker. To exercise the real database path, start Postgres first and run `E2E_USE_REAL_DB=true pnpm --filter api-gateway test:e2e`.

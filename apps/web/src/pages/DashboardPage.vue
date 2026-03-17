@@ -1,71 +1,156 @@
 <template>
-  <main class="mx-auto max-w-4xl px-6 py-10 space-y-6">
-    <!-- Welcome -->
-    <h1 class="text-2xl font-bold text-slate-900">{{ $t('dashboard.welcome', { email: authStore.user?.email }) }}</h1>
+  <main class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+    <section class="glass-panel-strong overflow-hidden rounded-[2.4rem] p-6 md:p-8">
+      <div class="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div>
+          <p class="section-kicker">{{ $t('nav.dashboard') }}</p>
+          <h1 class="mt-3 max-w-3xl text-3xl font-semibold leading-tight text-[var(--page-ink)] md:text-5xl">
+            {{ $t('dashboard.welcome', { email: authStore.user?.email }) }}
+          </h1>
+          <p class="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted-ink)] md:text-base">
+            {{ $t('home.hero.desc') }}
+          </p>
 
-    <!-- Stats -->
-    <div class="grid gap-4 sm:grid-cols-3">
-      <el-card shadow="hover">
-        <el-skeleton v-if="loadingStats" :rows="1" animated />
-        <template v-else>
-          <p class="text-sm text-slate-500">{{ $t('dashboard.creditBalance') }}</p>
-          <p class="mt-1 text-3xl font-bold">{{ creditBalance }}</p>
-        </template>
-      </el-card>
-      <el-card shadow="hover">
-        <el-skeleton v-if="loadingStats" :rows="1" animated />
-        <template v-else>
-          <p class="text-sm text-slate-500">{{ $t('dashboard.totalRecordings') }}</p>
-          <p class="mt-1 text-3xl font-bold">{{ totalRecordings }}</p>
-        </template>
-      </el-card>
-      <el-card shadow="hover">
-        <el-skeleton v-if="loadingStats" :rows="1" animated />
-        <template v-else>
-          <p class="text-sm text-slate-500">{{ $t('dashboard.totalAssessments') }}</p>
-          <p class="mt-1 text-3xl font-bold">{{ totalAssessments }}</p>
-        </template>
-      </el-card>
-    </div>
-
-    <!-- Quick actions -->
-    <div class="flex flex-wrap gap-3">
-      <router-link to="/speaking" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">{{ $t('dashboard.startRecording') }}</router-link>
-      <router-link to="/coach" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">{{ $t('dashboard.newAssessment') }}</router-link>
-      <router-link to="/billing" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ $t('dashboard.buyCredits') }}</router-link>
-    </div>
-
-    <!-- Recent assessments -->
-    <el-card>
-      <template #header><h2 class="text-lg font-medium">{{ $t('dashboard.recentAssessments') }}</h2></template>
-      <el-skeleton v-if="loadingAssessments" :rows="3" animated />
-      <template v-else>
-        <div v-if="assessments.length === 0" class="text-sm text-slate-400">{{ $t('dashboard.noAssessments') }}</div>
-        <div v-for="item in assessments" :key="item.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium truncate">{{ item.inputText || '(recording)' }}</p>
-            <p class="text-xs text-slate-400">{{ new Date(item.createdAt).toLocaleString() }}</p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <router-link
+              to="/speaking"
+              class="rounded-full bg-[var(--page-ink)] px-5 py-3 text-sm font-semibold text-white hover:bg-[#10261e]"
+            >
+              {{ $t('dashboard.startRecording') }}
+            </router-link>
+            <router-link
+              to="/coach"
+              class="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0d695f]"
+            >
+              {{ $t('dashboard.newAssessment') }}
+            </router-link>
+            <router-link
+              to="/billing"
+              class="rounded-full border border-black/10 bg-white/75 px-5 py-3 text-sm font-semibold text-[var(--page-ink)] hover:bg-white"
+            >
+              {{ $t('dashboard.buyCredits') }}
+            </router-link>
           </div>
-          <span :class="[
-            'ml-3 rounded-full px-2 py-0.5 text-xs font-medium',
-            item.status === 'SUCCEEDED' ? 'bg-green-100 text-green-700' :
-            item.status === 'FAILED' ? 'bg-red-100 text-red-700' :
-            'bg-yellow-100 text-yellow-700',
-          ]">{{ item.status }}</span>
         </div>
-      </template>
-    </el-card>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="rounded-[1.8rem] border border-black/8 bg-white/76 p-5 sm:col-span-2">
+            <p class="text-xs uppercase tracking-[0.24em] text-[var(--soft-ink)]">{{ $t('dashboard.creditBalance') }}</p>
+            <div class="mt-4 flex items-end justify-between gap-4">
+              <div>
+                <p class="text-4xl font-semibold text-[var(--page-ink)]">{{ creditBalance }}</p>
+                <p class="mt-2 text-sm text-[var(--muted-ink)]">{{ $t('coach.credits', { n: creditBalance }) }}</p>
+              </div>
+              <div class="signal-bars flex items-end gap-1.5">
+                <span style="height: 14px;" />
+                <span style="height: 30px;" />
+                <span style="height: 18px;" />
+                <span style="height: 24px;" />
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-for="stat in statCards"
+            :key="stat.label"
+            class="rounded-[1.8rem] border border-black/8 bg-white/76 p-5"
+          >
+            <p class="text-xs uppercase tracking-[0.22em] text-[var(--soft-ink)]">{{ stat.label }}</p>
+            <el-skeleton v-if="loadingStats" :rows="1" animated />
+            <template v-else>
+              <p class="mt-3 text-3xl font-semibold text-[var(--page-ink)]">{{ stat.value }}</p>
+              <p class="mt-2 text-sm text-[var(--muted-ink)]">{{ stat.caption }}</p>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <div class="glass-panel rounded-[2.2rem] p-6">
+        <p class="section-kicker">{{ $t('home.howItWorks') }}</p>
+        <div class="mt-5 space-y-4">
+          <router-link
+            v-for="action in actions"
+            :key="action.to"
+            :to="action.to"
+            class="block rounded-[1.6rem] border border-black/8 bg-white/78 p-5 hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-lg font-semibold text-[var(--page-ink)]">{{ action.title }}</p>
+                <p class="mt-2 text-sm leading-7 text-[var(--muted-ink)]">{{ action.subtitle }}</p>
+              </div>
+              <span class="rounded-full bg-[rgba(15,118,110,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+                {{ action.badge }}
+              </span>
+            </div>
+          </router-link>
+        </div>
+      </div>
+
+      <div class="glass-panel rounded-[2.2rem] p-6">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <p class="section-kicker">{{ $t('nav.coach') }}</p>
+            <h2 class="mt-2 text-2xl font-semibold text-[var(--page-ink)]">{{ $t('dashboard.recentAssessments') }}</h2>
+          </div>
+          <div class="rounded-full border border-black/8 bg-white/70 px-4 py-2 text-xs font-semibold text-[var(--muted-ink)]">
+            {{ totalAssessments }}
+          </div>
+        </div>
+
+        <el-skeleton v-if="loadingAssessments" :rows="4" animated class="mt-6" />
+        <template v-else>
+          <div v-if="assessments.length === 0" class="mt-6 rounded-[1.6rem] border border-dashed border-black/10 bg-white/60 p-8 text-sm text-[var(--soft-ink)]">
+            {{ $t('dashboard.noAssessments') }}
+          </div>
+          <div v-else class="mt-6 space-y-4">
+            <div
+              v-for="item in assessments"
+              :key="item.id"
+              class="rounded-[1.6rem] border border-black/8 bg-white/78 p-5"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-[var(--page-ink)]">
+                    {{ item.inputText || '(recording)' }}
+                  </p>
+                  <p class="mt-2 text-xs uppercase tracking-[0.2em] text-[var(--soft-ink)]">
+                    {{ new Date(item.createdAt).toLocaleString() }}
+                  </p>
+                </div>
+                <span
+                  :class="[
+                    'rounded-full px-3 py-1 text-xs font-semibold',
+                    item.status === 'SUCCEEDED'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : item.status === 'FAILED'
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-amber-100 text-amber-700',
+                  ]"
+                >
+                  {{ item.status }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { http } from '../lib/http';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const loadingStats = ref(true);
 const loadingAssessments = ref(true);
@@ -81,6 +166,40 @@ interface AssessmentItem {
 }
 
 const assessments = ref<AssessmentItem[]>([]);
+
+const statCards = computed(() => [
+  {
+    label: t('dashboard.totalRecordings'),
+    value: totalRecordings.value,
+    caption: t('home.features.speakingDesc'),
+  },
+  {
+    label: t('dashboard.totalAssessments'),
+    value: totalAssessments.value,
+    caption: t('home.features.coachDesc'),
+  },
+]);
+
+const actions = computed(() => [
+  {
+    to: '/speaking',
+    title: t('dashboard.startRecording'),
+    subtitle: t('home.steps.recordDesc'),
+    badge: t('nav.speaking'),
+  },
+  {
+    to: '/coach',
+    title: t('dashboard.newAssessment'),
+    subtitle: t('home.steps.analyzeDesc'),
+    badge: t('nav.coach'),
+  },
+  {
+    to: '/billing',
+    title: t('dashboard.buyCredits'),
+    subtitle: t('home.features.creditsDesc'),
+    badge: t('nav.billing'),
+  },
+]);
 
 onMounted(async () => {
   if (!authStore.user && authStore.isAuthenticated) {
