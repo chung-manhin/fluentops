@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import * as request from 'supertest';
+import request, { Response } from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma';
 import { MinioService } from './../src/media';
@@ -73,7 +73,7 @@ describe('App (e2e)', () => {
     return request(app.getHttpServer())
       .get('/health')
       .expect(200)
-      .expect((res) => {
+      .expect((res: Response) => {
         expect(res.body.status).toBe('ok');
         expect(res.body.db).toBe('up');
         expect(typeof res.body.uptime).toBe('number');
