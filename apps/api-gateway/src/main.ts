@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { WsAdapter } from '@nestjs/platform-ws';
 import * as express from 'express';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -14,6 +15,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   app.useLogger(app.get(Logger));
+  app.useWebSocketAdapter(new WsAdapter(app));
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {

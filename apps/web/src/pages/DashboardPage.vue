@@ -34,6 +34,10 @@
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <HeroOrbitScene />
+          </div>
+
           <div class="rounded-[1.8rem] border border-black/8 bg-white/76 p-5 sm:col-span-2">
             <p class="text-xs uppercase tracking-[0.24em] text-[var(--soft-ink)]">{{ $t('dashboard.creditBalance') }}</p>
             <div class="mt-4 flex items-end justify-between gap-4">
@@ -147,6 +151,7 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { http } from '../lib/http';
+import HeroOrbitScene from '../components/HeroOrbitScene.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();

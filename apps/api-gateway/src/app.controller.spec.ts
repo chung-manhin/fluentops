@@ -2,16 +2,22 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Response } from 'express';
 import { AppController } from './app.controller';
 import { PrismaService } from './prisma';
+import { RedisService } from './redis/redis.service';
 
 describe('AppController', () => {
   let appController: AppController;
   let prisma: { $queryRaw: jest.Mock };
+  let redis: { getStatus: jest.Mock };
 
   beforeEach(async () => {
     prisma = { $queryRaw: jest.fn() };
+    redis = { getStatus: jest.fn().mockReturnValue('disabled') };
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [{ provide: PrismaService, useValue: prisma }],
+      providers: [
+        { provide: PrismaService, useValue: prisma },
+        { provide: RedisService, useValue: redis },
+      ],
     }).compile();
 
     appController = app.get<AppController>(AppController);
@@ -23,7 +29,7 @@ describe('AppController', () => {
     const res = { status: jest.fn().mockReturnValue({ json }) } as unknown as Response;
     await appController.health(res);
     expect((res.status as jest.Mock)).toHaveBeenCalledWith(200);
-    expect(json).toHaveBeenCalledWith(expect.objectContaining({ status: 'ok', db: 'up' }));
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ status: 'ok', db: 'up', redis: 'disabled' }));
   });
 
   it('GET /health returns 503 when DB is down', async () => {
@@ -32,6 +38,6 @@ describe('AppController', () => {
     const res = { status: jest.fn().mockReturnValue({ json }) } as unknown as Response;
     await appController.health(res);
     expect((res.status as jest.Mock)).toHaveBeenCalledWith(503);
-    expect(json).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', db: 'down' }));
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', db: 'down', redis: 'disabled' }));
   });
 });

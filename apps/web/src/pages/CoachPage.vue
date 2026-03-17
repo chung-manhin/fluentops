@@ -108,11 +108,16 @@
               <p class="section-kicker">{{ $t('coach.progress') }}</p>
               <h2 class="mt-2 text-2xl font-semibold text-[var(--page-ink)]">{{ $t('coach.progress') }}</h2>
             </div>
-            <div class="signal-bars flex items-end gap-1.5">
-              <span style="height: 14px;" />
-              <span style="height: 30px;" />
-              <span style="height: 18px;" />
-              <span style="height: 24px;" />
+            <div class="flex items-center gap-3">
+              <span class="rounded-full bg-[rgba(15,118,110,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+                {{ $t('coach.realtime') }}
+              </span>
+              <div class="signal-bars flex items-end gap-1.5">
+                <span style="height: 14px;" />
+                <span style="height: 30px;" />
+                <span style="height: 18px;" />
+                <span style="height: 24px;" />
+              </div>
             </div>
           </div>
           <el-progress
@@ -132,9 +137,17 @@
               <p class="section-kicker">{{ $t('coach.result') }}</p>
               <h2 class="mt-2 text-2xl font-semibold text-[var(--page-ink)]">{{ $t('coach.result') }}</h2>
             </div>
-            <span class="rounded-full bg-[rgba(15,118,110,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
-              {{ $t('nav.coach') }}
-            </span>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <span class="rounded-full bg-[rgba(15,118,110,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+                {{ $t('coach.averageScore', { n: averageScore }) }}
+              </span>
+              <el-button size="small" class="!rounded-full" :loading="sendingEmail" @click="emailSummary">
+                {{ $t('coach.emailSummary') }}
+              </el-button>
+              <el-button size="small" class="!rounded-full" @click="downloadPosterImage">
+                {{ $t('coach.downloadPoster') }}
+              </el-button>
+            </div>
           </div>
 
           <div v-if="result.rubric" class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -190,11 +203,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { ElMessage } from 'element-plus';
 import { http } from '../lib/http';
+import { useAuthStore } from '../stores/auth';
+import { useAssessmentRealtime } from '../composables/useAssessmentRealtime';
+import { downloadAssessmentPoster } from '../lib/poster';
 
 const { t } = useI18n();
+const authStore = useAuthStore();
+const realtime = useAssessmentRealtime();
 
 interface AssessResult {
   rubric?: Record<string, number>;
@@ -223,7 +242,16 @@ const result = ref<AssessResult | null>(null);
 const history = ref<HistoryItem[]>([]);
 const historyLoading = ref(false);
 const credits = ref(0);
-let lastEventId = -1;
+const sendingEmail = ref(false);
+const currentAssessmentId = ref('');
+const currentAssessmentInput = ref('');
+const currentAssessmentCreatedAt = ref(new Date().toISOString());
+
+const averageScore = computed(() => {
+  const values = Object.values(result.value?.rubric ?? {});
+  if (values.length === 0) return 0;
+  return Math.round(values.reduce((total, value) => total + value, 0) / values.length);
+});
 
 async function loadBalance() {
   try {
@@ -250,6 +278,7 @@ onMounted(() => {
   loadHistory();
   loadBalance();
 });
+onBeforeUnmount(() => realtime.stop());
 
 async function viewAssessment(id: string) {
   try {
@@ -260,15 +289,14 @@ async function viewAssessment(id: string) {
       issues?: string[];
       rewrites?: string[];
       drills?: string[];
+      createdAt: string;
+      inputText: string | null;
     }>(`/ai/assess/${id}`);
+    currentAssessmentId.value = id;
+    currentAssessmentCreatedAt.value = data.createdAt;
+    currentAssessmentInput.value = data.inputText ?? '';
     if (data.status === 'SUCCEEDED') {
-      result.value = {
-        rubric: data.rubricJson ?? undefined,
-        feedbackMarkdown: data.feedbackMarkdown ?? undefined,
-        issues: data.issues,
-        rewrites: data.rewrites,
-        drills: data.drills,
-      };
+      result.value = mapAssessmentPayload(data);
       streaming.value = false;
       errorMsg.value = '';
     } else if (data.status === 'FAILED') {
@@ -288,16 +316,37 @@ async function submit() {
   result.value = null;
   progressPct.value = 0;
   progressStage.value = '';
-  lastEventId = -1;
 
   try {
-    const { data } = await http.post<{ assessmentId: string; sseUrl: string }>('/ai/assess', {
+    const payload = inputText.value.trim();
+    currentAssessmentInput.value = payload;
+    currentAssessmentCreatedAt.value = new Date().toISOString();
+
+    const { data } = await http.post<{ assessmentId: string; sseUrl: string; wsUrl?: string }>('/ai/assess', {
       inputType: 'text',
-      text: inputText.value,
+      text: payload,
     });
 
+    currentAssessmentId.value = data.assessmentId;
     streaming.value = true;
-    await readSSE(data.assessmentId);
+    await realtime.stream({
+      assessmentId: data.assessmentId,
+      onProgress: (payload) => {
+        progressPct.value = payload.pct || 0;
+        progressStage.value = payload.stage || '';
+      },
+      onFinal: (payload) => {
+        progressPct.value = 100;
+        result.value = mapAssessmentPayload(payload as Parameters<typeof mapAssessmentPayload>[0]);
+        streaming.value = false;
+        errorMsg.value = '';
+      },
+      onError: (payload) => {
+        errorMsg.value = payload.message || t('coach.failed');
+        streaming.value = false;
+      },
+      onFallbackPoll: () => pollResult(data.assessmentId),
+    });
     await loadHistory();
     await loadBalance();
   } catch (err) {
@@ -305,88 +354,6 @@ async function submit() {
     errorMsg.value = t('coach.startError');
   } finally {
     loading.value = false;
-  }
-}
-
-async function readSSE(assessmentId: string) {
-  const baseUrl = http.defaults.baseURL || 'http://localhost:3000';
-  const token = localStorage.getItem('accessToken');
-  const sinceParam = lastEventId >= 0 ? `?since=${lastEventId}` : '';
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-
-  let res: Response;
-  try {
-    res = await fetch(`${baseUrl}/ai/assess/${assessmentId}/stream${sinceParam}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
-  } catch {
-    clearTimeout(timeout);
-    await pollResult(assessmentId);
-    return;
-  }
-
-  if (!res.ok || !res.body) {
-    clearTimeout(timeout);
-    errorMsg.value = t('coach.streamError');
-    streaming.value = false;
-    return;
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      clearTimeout(timeout);
-      buffer += decoder.decode(value, { stream: true });
-
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop() || '';
-
-      for (const part of parts) {
-        const lines = part.split('\n');
-        let eventType = '';
-        let eventData = '';
-        let eventId = '';
-        for (const line of lines) {
-          if (line.startsWith('event: ')) eventType = line.slice(7);
-          else if (line.startsWith('data: ')) eventData = line.slice(6);
-          else if (line.startsWith('id: ')) eventId = line.slice(4);
-        }
-        if (eventId) lastEventId = parseInt(eventId, 10);
-        if (!eventData) continue;
-
-        try {
-          const payload = JSON.parse(eventData);
-          if (eventType === 'progress') {
-            progressPct.value = payload.pct || 0;
-            progressStage.value = payload.stage || '';
-          } else if (eventType === 'final') {
-            progressPct.value = 100;
-            result.value = payload;
-            streaming.value = false;
-          } else if (eventType === 'error') {
-            errorMsg.value = payload.message || t('coach.failed');
-            streaming.value = false;
-          }
-        } catch (err) {
-          console.warn('Failed to parse SSE event', err);
-        }
-      }
-    }
-  } catch {
-    // fall through to polling
-  } finally {
-    reader.cancel().catch(() => {});
-  }
-
-  if (!result.value && !errorMsg.value) {
-    await pollResult(assessmentId);
   }
 }
 
@@ -401,15 +368,14 @@ async function pollResult(assessmentId: string, retries = 0) {
       issues?: string[];
       rewrites?: string[];
       drills?: string[];
+      createdAt: string;
+      inputText: string | null;
     }>(`/ai/assess/${assessmentId}`);
     if (data.status === 'SUCCEEDED' && data.rubricJson) {
-      result.value = {
-        rubric: data.rubricJson,
-        feedbackMarkdown: data.feedbackMarkdown ?? undefined,
-        issues: data.issues,
-        rewrites: data.rewrites,
-        drills: data.drills,
-      };
+      currentAssessmentId.value = assessmentId;
+      currentAssessmentCreatedAt.value = data.createdAt;
+      currentAssessmentInput.value = data.inputText ?? '';
+      result.value = mapAssessmentPayload(data);
       progressPct.value = 100;
     } else if (data.status === 'FAILED') {
       errorMsg.value = t('coach.failed');
@@ -427,5 +393,47 @@ async function pollResult(assessmentId: string, retries = 0) {
     }
   }
   streaming.value = false;
+}
+
+async function emailSummary() {
+  if (!currentAssessmentId.value) return;
+  sendingEmail.value = true;
+  try {
+    await http.post('/notifications/assessment-email', { assessmentId: currentAssessmentId.value });
+    ElMessage.success(t('coach.emailSuccess'));
+  } catch (err) {
+    console.warn('Failed to send assessment summary email', err);
+    ElMessage.error(t('coach.emailFailed'));
+  } finally {
+    sendingEmail.value = false;
+  }
+}
+
+function downloadPosterImage() {
+  if (!result.value) return;
+  downloadAssessmentPoster({
+    email: authStore.user?.email ?? 'fluentops@example.com',
+    createdAt: currentAssessmentCreatedAt.value,
+    inputText: currentAssessmentInput.value,
+    rubric: result.value.rubric,
+    feedback: result.value.feedbackMarkdown ?? '',
+  });
+}
+
+function mapAssessmentPayload(payload: {
+  rubricJson?: Record<string, number> | null;
+  rubric?: Record<string, number>;
+  feedbackMarkdown?: string | null;
+  issues?: string[];
+  rewrites?: string[];
+  drills?: string[];
+}) {
+  return {
+    rubric: payload.rubricJson ?? payload.rubric ?? undefined,
+    feedbackMarkdown: payload.feedbackMarkdown ?? undefined,
+    issues: payload.issues,
+    rewrites: payload.rewrites,
+    drills: payload.drills,
+  };
 }
 </script>

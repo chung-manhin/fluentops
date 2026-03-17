@@ -12,6 +12,7 @@ import { BillingService } from '../billing';
 import { buildGraph, createLLM, runMockWorkflow } from './ai-coach.workflow';
 import { AssessDto } from './dto';
 import { PaginationDto } from '../common/pagination.dto';
+import { AssessmentRealtimeService } from '../realtime/assessment-realtime.service';
 
 const STAGE_PCT: Record<string, [number, number]> = {
   diagnose: [5, 25],
@@ -30,6 +31,7 @@ export class AICoachService {
     private prisma: PrismaService,
     private config: ConfigService,
     private billingService: BillingService,
+    private realtimeService: AssessmentRealtimeService,
   ) {}
 
   async createAssessment(userId: string, dto: AssessDto) {
@@ -87,6 +89,13 @@ export class AICoachService {
               data: { assessmentId, seq: count, type: 'ERROR', payloadJson: { message: 'Assessment timed out or failed unexpectedly' } },
             });
             await tx.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
+            this.realtimeService.publish({
+              assessmentId,
+              userId,
+              seq: count,
+              type: 'error',
+              data: { message: 'Assessment timed out or failed unexpectedly' },
+            });
           }
         });
         await this.billingService.refundCredit(userId, 'ai_assess_refund', assessmentId);
@@ -111,7 +120,7 @@ export class AICoachService {
     try {
       let seq = 0;
       const writeProgress = async (stage: string, pct: number) => {
-        await this.writeEvent(assessmentId, seq++, 'PROGRESS', { stage, pct });
+        await this.writeEvent(assessmentId, userId, seq++, 'PROGRESS', { stage, pct });
       };
 
       let result: { issues: string[]; rewrites: string[]; drills: string[]; rubric: Record<string, number>; feedback: string };
@@ -160,7 +169,7 @@ export class AICoachService {
         feedbackMarkdown: result.feedback,
       };
 
-      await this.writeEvent(assessmentId, seq++, 'FINAL', finalPayload);
+      await this.writeEvent(assessmentId, userId, seq++, 'FINAL', finalPayload);
 
       await this.prisma.assessment.update({
         where: { id: assessmentId },
@@ -174,14 +183,20 @@ export class AICoachService {
       });
       if (current?.status === 'RUNNING') {
         const count = await this.prisma.assessmentEvent.count({ where: { assessmentId } });
-        await this.writeEvent(assessmentId, count, 'ERROR', { message: 'Assessment failed' });
+        await this.writeEvent(assessmentId, userId, count, 'ERROR', { message: 'Assessment failed' });
         await this.prisma.assessment.update({ where: { id: assessmentId }, data: { status: 'FAILED' } });
       }
       await this.billingService.refundCredit(userId, 'ai_assess_refund', assessmentId);
     }
   }
 
-  private async writeEvent(assessmentId: string, seq: number, type: string, payload: unknown) {
+  private async writeEvent(
+    assessmentId: string,
+    userId: string,
+    seq: number,
+    type: string,
+    payload: unknown,
+  ) {
     await this.prisma.assessmentEvent.create({
       data: {
         assessmentId,
@@ -190,6 +205,16 @@ export class AICoachService {
         payloadJson: payload as object,
       },
     });
+
+    if (type === 'PROGRESS' || type === 'FINAL' || type === 'ERROR') {
+      this.realtimeService.publish({
+        assessmentId,
+        userId,
+        seq,
+        type: type.toLowerCase() as 'progress' | 'final' | 'error',
+        data: payload,
+      });
+    }
   }
 
   async getAssessment(userId: string, id: string) {

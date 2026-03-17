@@ -4,9 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { BillingService } from './billing.service';
 import { PrismaService } from '../prisma';
 import { AlipayService } from './alipay.service';
+import { RedisService } from '../redis/redis.service';
 
 describe('BillingService', () => {
   let service: BillingService;
+  let redis: { getJson: jest.Mock; setJson: jest.Mock; del: jest.Mock };
   let prisma: {
     plan: { upsert: jest.Mock; findMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     order: { create: jest.Mock; findFirstOrThrow: jest.Mock; findUniqueOrThrow: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
@@ -23,6 +25,7 @@ describe('BillingService', () => {
       creditLedger: { create: jest.fn() },
       $transaction: jest.fn((fn) => fn(prisma)),
     };
+    redis = { getJson: jest.fn(), setJson: jest.fn(), del: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -30,6 +33,7 @@ describe('BillingService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: () => 'mock' } },
         { provide: AlipayService, useValue: { isEnabled: () => false } },
+        { provide: RedisService, useValue: redis },
       ],
     }).compile();
 

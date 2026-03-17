@@ -47,7 +47,11 @@ export class AICoachController {
     }
     try {
       const result = await this.aiCoachService.createAssessment(req.user.id, dto);
-      return { ...result, sseUrl: `/api/v1/ai/assess/${result.assessmentId}/stream` };
+      return {
+        ...result,
+        sseUrl: `/api/v1/ai/assess/${result.assessmentId}/stream`,
+        wsUrl: `/ws/assessments`,
+      };
     } catch (error) {
       if (
         error instanceof BadRequestException &&

@@ -34,12 +34,14 @@ Full-stack English learning platform — product-ready monorepo.
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Vue 3, Vite 5, Pinia, Vue Router, Axios, Element Plus, Tailwind CSS v4, GSAP |
-| Backend | NestJS, Prisma 5, JWT, Jest |
+| Frontend | Vue 3, TypeScript, Vite 5, Pinia, Vue Router, Axios, Element Plus, Tailwind CSS v4, GSAP, native WebSocket, fetch-based SSE fallback |
+| Backend | NestJS, Prisma 5, JWT, WebSocket gateway, Redis cache, scheduled maintenance tasks, Jest |
 | Shared | TypeScript `tsc` build (types + utils) |
 | Infra | Docker Compose, PostgreSQL, Redis, MinIO |
 | CI | GitHub Actions — lint, typecheck, build, e2e |
-| AI | LangGraph.js, OpenAI (with mock provider for CI) |
+| AI | LangChain.js, LangGraph.js, OpenAI (with mock provider for CI) |
+| Visualization | Three.js hero scene, Canvas poster export, WebAssembly audio helper |
+| Notifications | Email summary service (`mock` or Resend HTTP API) |
 
 ## Repository Layout
 
@@ -62,9 +64,10 @@ docs/
 
 - Register -> login -> refresh -> logout
 - Load current user state on protected routes
-- Record audio -> upload to MinIO -> replay recording
-- Submit text -> stream AI assessment progress via SSE -> revisit history
+- Record audio via WebRTC media capture -> upload to MinIO -> replay recording
+- Submit text -> stream AI assessment progress via WebSocket first, with SSE fallback -> revisit history
 - Check credits -> create order -> mock pay -> consume credits on assessment
+- Email a finished assessment summary and export a shareable poster
 - Handle empty, loading, and failure states across the core pages
 
 ## Quick Start
@@ -116,11 +119,15 @@ Access tokens (15m) are stateless JWTs. Refresh tokens rotate on every use — t
 
 ### AI Coach Pipeline
 
-LangGraph.js orchestrates a 4-step workflow: diagnose → rewrite → drills → score. Results stream via SSE with `id:` sequence numbers for reconnection (`?since=N`). Setting `AI_PROVIDER=mock` swaps in a deterministic mock LLM — the full pipeline runs in CI without API keys.
+LangGraph.js orchestrates a 4-step workflow: diagnose → rewrite → drills → score. Results now stream first over a JWT-authenticated WebSocket gateway and fall back to SSE with `id:` sequence numbers for reconnection (`?since=N`). Setting `AI_PROVIDER=mock` swaps in a deterministic mock LLM — the full pipeline runs in CI without API keys.
 
 ### Credit Billing
 
 A provider interface abstracts payment: `mock` for CI/dev (instant fulfillment), `alipay` for sandbox testing (async notify callback). A credit guard checks balance before AI calls.
+
+### Realtime, Cache, and Automation
+
+Redis is used as an optional cache layer for plan lookups and surfaces in `/health` as `up`, `down`, or `disabled`. Scheduled maintenance jobs clean expired refresh tokens and cancel stale pending orders. Completed assessments can also be emailed through the notifications API.
 
 ## Recent Hardening
 
@@ -129,6 +136,11 @@ A provider interface abstracts payment: `mock` for CI/dev (instant fulfillment),
 - Atomic credit reservation before AI execution, plus idempotent refund on workflow failure
 - Media uploads now verify the object exists before creating a recording row
 - Assessment detail responses now include streamed drill / rewrite / issue data
+- Redis-backed plan caching with graceful disablement when `REDIS_URL` is not configured
+- WebSocket gateway for assessment progress, plus frontend singleton realtime composable with SSE fallback
+- Three.js + GSAP product visuals, client-side poster export, and a lightweight WebAssembly audio helper
+- Mock/Resend email summary delivery for completed assessments
+- Scheduled cleanup jobs for refresh tokens and stale pending orders
 - Global throttling now uses an initialization-safe guard, avoiding intermittent auth 500s during startup
 - Stronger password guidance and route-level auth bootstrap on the frontend
 - Dependency risk reduced via direct upgrades and `pnpm.overrides`
@@ -215,9 +227,12 @@ See `apps/api-gateway/.env.example` for all variables. Key ones:
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` / `REFRESH_SECRET` | Token signing secrets |
 | `MINIO_*` | MinIO connection (endpoint, port, keys, bucket) |
+| `REDIS_URL` | Optional Redis connection string for cache + health |
 | `AI_PROVIDER` | `mock` (default) or omit for OpenAI |
 | `OPENAI_API_KEY` | Required when not using mock |
 | `BILLING_PROVIDER` | `mock` (default) or `alipay` |
+| `EMAIL_PROVIDER` | `mock` (default) or `resend` |
+| `EMAIL_FROM` / `RESEND_API_KEY` | Optional email summary delivery config |
 
 Ports: Postgres 5432, Redis 6379, MinIO 9000/9001, API 3000, Web 5173
 

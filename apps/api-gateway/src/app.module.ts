@@ -13,6 +13,11 @@ import { AICoachModule } from './ai-coach';
 import { validate } from './config/env.validation';
 import { AppThrottlerGuard } from './common/app-throttler.guard';
 import { RequestIdMiddleware } from './common/request-id.middleware';
+import { RedisModule } from './redis/redis.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -32,13 +37,18 @@ import { RequestIdMiddleware } from './common/request-id.middleware';
         };
       },
     }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({ throttlers: [{ ttl: 60000, limit: 20 }] }),
+    RedisModule,
     PrismaModule,
     AuthModule,
     UserModule,
     MediaModule,
     BillingModule,
     AICoachModule,
+    RealtimeModule,
+    NotificationsModule,
+    MaintenanceModule,
   ],
   controllers: [AppController],
   providers: [

@@ -21,11 +21,8 @@
                 VO
               </div>
 
-              <div v-if="state === 'recording'" class="signal-bars mt-6 flex items-end gap-1.5">
-                <span style="height: 18px;" />
-                <span style="height: 34px;" />
-                <span style="height: 22px;" />
-                <span style="height: 30px;" />
+              <div class="signal-bars mt-6 flex items-end gap-1.5">
+                <span v-for="(bar, index) in levelBars" :key="index" :style="{ height: `${bar}px` }" />
               </div>
 
               <p class="mt-6 text-lg font-semibold text-[var(--page-ink)]">
@@ -38,6 +35,9 @@
                 }}
               </p>
               <p class="mt-2 text-sm leading-7 text-[var(--muted-ink)]">{{ $t('home.steps.recordDesc') }}</p>
+              <p class="mt-3 rounded-full border border-black/8 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--soft-ink)]">
+                {{ $t('speaking.liveMeter', { state: levelText }) }}
+              </p>
             </div>
 
             <div class="mt-6 flex flex-wrap justify-center gap-3">
@@ -130,10 +130,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted } from 'vue';
+import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { http } from '../lib/http';
+import { useMicAnalyzer } from '../composables/useMicAnalyzer';
 
 const { t } = useI18n();
 
@@ -154,6 +155,7 @@ const mediaRecorder = shallowRef<MediaRecorder | null>(null);
 const stream = shallowRef<MediaStream | null>(null);
 const chunks = shallowRef<Blob[]>([]);
 const recordStart = ref(0);
+const { levelBars, levelText, attach, cleanup } = useMicAnalyzer();
 
 async function loadRecordings() {
   const { data } = await http.get<RecordingItem[]>('/media');
@@ -161,11 +163,18 @@ async function loadRecordings() {
 }
 
 onMounted(loadRecordings);
+onBeforeUnmount(cleanup);
 
 async function startRecording() {
   try {
     stream.value = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder.value = new MediaRecorder(stream.value, { mimeType: 'audio/webm' });
+    await attach(stream.value);
+
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm';
+
+    mediaRecorder.value = new MediaRecorder(stream.value, { mimeType });
     chunks.value = [];
     recordStart.value = Date.now();
     mediaRecorder.value.ondataavailable = (e) => {
@@ -173,6 +182,7 @@ async function startRecording() {
     };
     mediaRecorder.value.onstop = async () => {
       stream.value?.getTracks().forEach((t) => t.stop());
+      cleanup();
       const blob = new Blob(chunks.value, { type: 'audio/webm' });
       const durationMs = Date.now() - recordStart.value;
       await uploadBlob(blob, durationMs);
@@ -180,6 +190,7 @@ async function startRecording() {
     mediaRecorder.value.start();
     state.value = 'recording';
   } catch {
+    cleanup();
     ElMessage.error(t('speaking.micDenied'));
   }
 }

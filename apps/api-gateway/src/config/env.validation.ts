@@ -78,11 +78,26 @@ class EnvVars {
 
   @IsString()
   @IsOptional()
+  REDIS_URL?: string;
+
+  @IsString()
+  @IsOptional()
   ALIPAY_GATEWAY?: string;
 
   @IsString()
   @IsOptional()
   ALIPAY_NOTIFY_URL?: string;
+
+  @IsString()
+  EMAIL_PROVIDER: string = 'mock';
+
+  @IsString()
+  @IsOptional()
+  EMAIL_FROM?: string;
+
+  @IsString()
+  @IsOptional()
+  RESEND_API_KEY?: string;
 
   @IsString()
   @IsOptional()

@@ -1,6 +1,7 @@
 export type HealthResponse = {
   status: 'ok' | 'error';
   db: 'up' | 'down';
+  redis?: 'up' | 'down' | 'disabled';
   uptime: number;
 };
 
@@ -70,6 +71,7 @@ export type AssessmentCreatedDto = {
   assessmentId: string;
   traceId: string;
   sseUrl: string;
+  wsUrl?: string;
 };
 
 export type PresignResponseDto = {

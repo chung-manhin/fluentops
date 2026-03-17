@@ -72,6 +72,7 @@ export default {
   'speaking.uploaded': '录音已上传',
   'speaking.uploadFailed': '上传失败，请重试',
   'speaking.fileTooLarge': '文件过大（最大 100MB）',
+  'speaking.liveMeter': 'WebRTC 电平：{state}',
 
   // Coach
   'coach.submitTitle': '提交文本进行评估',
@@ -88,6 +89,12 @@ export default {
   'coach.refresh': '刷新',
   'coach.noHistory': '暂无评估记录。',
   'coach.view': '查看',
+  'coach.realtime': 'WebSocket + SSE 实时流',
+  'coach.averageScore': '平均分 {n}',
+  'coach.emailSummary': '邮件摘要',
+  'coach.downloadPoster': '下载海报',
+  'coach.emailSuccess': '评估摘要已发送',
+  'coach.emailFailed': '发送摘要失败',
   'coach.streamError': '连接 SSE 流失败',
   'coach.startError': '启动评估失败',
   'coach.loadError': '加载评估失败',

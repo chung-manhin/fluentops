@@ -1,6 +1,6 @@
 # API Reference
 
-Base URL: `http://localhost:3000`
+Base URL: `http://localhost:3000/api/v1`
 
 All authenticated endpoints require `Authorization: Bearer <accessToken>`.
 
@@ -11,7 +11,7 @@ All authenticated endpoints require `Authorization: Bearer <accessToken>`.
 ### Register
 
 ```bash
-curl -X POST http://localhost:3000/auth/register \
+curl -X POST http://localhost:3000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"password123"}'
 ```
@@ -19,7 +19,7 @@ curl -X POST http://localhost:3000/auth/register \
 ### Login
 
 ```bash
-curl -X POST http://localhost:3000/auth/login \
+curl -X POST http://localhost:3000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"password123"}'
 # Returns: {"accessToken":"...","refreshToken":"..."}
@@ -28,14 +28,14 @@ curl -X POST http://localhost:3000/auth/login \
 ### Get Current User
 
 ```bash
-curl http://localhost:3000/me \
+curl http://localhost:3000/api/v1/me \
   -H "Authorization: Bearer <accessToken>"
 ```
 
 ### Refresh Tokens
 
 ```bash
-curl -X POST http://localhost:3000/auth/refresh \
+curl -X POST http://localhost:3000/api/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<refreshToken>"}'
 ```
@@ -43,7 +43,7 @@ curl -X POST http://localhost:3000/auth/refresh \
 ### Logout
 
 ```bash
-curl -X POST http://localhost:3000/auth/logout \
+curl -X POST http://localhost:3000/api/v1/auth/logout \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<refreshToken>"}'
 ```
@@ -59,7 +59,7 @@ All endpoints require Bearer token.
 ```bash
 TOKEN="<accessToken>"
 
-curl -X POST http://localhost:3000/media/presign \
+curl -X POST http://localhost:3000/api/v1/media/presign \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"filename":"test.webm","contentType":"audio/webm"}'
@@ -77,7 +77,7 @@ curl -X PUT "<uploadUrl>" \
 ### Complete Upload
 
 ```bash
-curl -X POST http://localhost:3000/media/complete \
+curl -X POST http://localhost:3000/api/v1/media/complete \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"objectKey":"<objectKey>","sizeBytes":12345,"mimeType":"audio/webm","durationMs":5000}'
@@ -87,14 +87,14 @@ curl -X POST http://localhost:3000/media/complete \
 ### List Recordings
 
 ```bash
-curl http://localhost:3000/media \
+curl http://localhost:3000/api/v1/media \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Get Recording Detail
 
 ```bash
-curl http://localhost:3000/media/<id> \
+curl http://localhost:3000/api/v1/media/<id> \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -109,36 +109,48 @@ All endpoints require Bearer token. Each assessment costs 1 credit.
 ```bash
 TOKEN="<accessToken>"
 
-curl -X POST http://localhost:3000/ai/assess \
+curl -X POST http://localhost:3000/api/v1/ai/assess \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"inputType":"text","text":"I go to school yesterday and buyed a book"}'
-# Returns: {"assessmentId":"...","traceId":"...","sseUrl":"/ai/assess/.../stream"}
+# Returns: {"assessmentId":"...","traceId":"...","sseUrl":"/api/v1/ai/assess/.../stream","wsUrl":"/ws/assessments"}
 ```
 
 ### Get Assessment Result
 
 ```bash
-curl http://localhost:3000/ai/assess/<assessmentId> \
+curl http://localhost:3000/api/v1/ai/assess/<assessmentId> \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### SSE Stream
 
 ```bash
-curl -N http://localhost:3000/ai/assess/<assessmentId>/stream \
+curl -N http://localhost:3000/api/v1/ai/assess/<assessmentId>/stream \
   -H "Authorization: Bearer $TOKEN"
 
 # Reconnect from seq 3
-curl -N "http://localhost:3000/ai/assess/<assessmentId>/stream?since=3" \
+curl -N "http://localhost:3000/api/v1/ai/assess/<assessmentId>/stream?since=3" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### List Recent Assessments
 
 ```bash
-curl http://localhost:3000/ai/assessments \
+curl http://localhost:3000/api/v1/ai/assessments \
   -H "Authorization: Bearer $TOKEN"
+```
+
+### WebSocket Stream
+
+Use the same JWT access token in the query string, then subscribe to an assessment ID.
+
+```text
+ws://localhost:3000/ws/assessments?token=<accessToken>
+```
+
+```json
+{"action":"subscribe","assessmentId":"<assessmentId>"}
 ```
 
 ### SSE Event Format
@@ -171,21 +183,21 @@ All endpoints require Bearer token except the Alipay notify callback.
 ```bash
 TOKEN="<accessToken>"
 
-curl http://localhost:3000/billing/plans \
+curl http://localhost:3000/api/v1/billing/plans \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Check Balance
 
 ```bash
-curl http://localhost:3000/billing/balance \
+curl http://localhost:3000/api/v1/billing/balance \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Create Order
 
 ```bash
-curl -X POST http://localhost:3000/billing/order \
+curl -X POST http://localhost:3000/api/v1/billing/order \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"planId":"<planId>"}'
@@ -194,10 +206,23 @@ curl -X POST http://localhost:3000/billing/order \
 ### Mock Pay (dev/CI only)
 
 ```bash
-curl -X POST http://localhost:3000/billing/mock/pay \
+curl -X POST http://localhost:3000/api/v1/billing/mock/pay \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"orderId":"<orderId>"}'
+```
+
+---
+
+## Notifications
+
+### Email Assessment Summary
+
+```bash
+curl -X POST http://localhost:3000/api/v1/notifications/assessment-email \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"assessmentId":"<assessmentId>"}'
 ```
 
 ---
@@ -213,6 +238,7 @@ curl -X POST http://localhost:3000/billing/mock/pay \
 | `REFRESH_SECRET` | Secret for refresh tokens |
 | `ACCESS_TOKEN_TTL` | Access token TTL (e.g., `15m`) |
 | `REFRESH_TOKEN_TTL` | Refresh token TTL (e.g., `7d`) |
+| `REDIS_URL` | Optional Redis connection string |
 
 ### MinIO
 
@@ -244,3 +270,11 @@ curl -X POST http://localhost:3000/billing/mock/pay \
 | `ALIPAY_PUBLIC_KEY` | — | Alipay public key |
 | `ALIPAY_GATEWAY` | sandbox URL | Alipay gateway endpoint |
 | `ALIPAY_NOTIFY_URL` | — | Public URL for async notifications |
+
+### Notifications
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EMAIL_PROVIDER` | `mock` | `mock` or `resend` |
+| `EMAIL_FROM` | — | Sender identity |
+| `RESEND_API_KEY` | — | Resend API key |

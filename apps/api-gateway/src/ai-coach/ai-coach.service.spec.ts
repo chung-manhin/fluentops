@@ -4,10 +4,12 @@ import { AICoachService } from './ai-coach.service';
 import { PrismaService } from '../prisma';
 import { BillingService } from '../billing';
 import { AssessDto } from './dto';
+import { AssessmentRealtimeService } from '../realtime/assessment-realtime.service';
 
 describe('AICoachService', () => {
   let service: AICoachService;
   let billingService: { deductCredit: jest.Mock; refundCredit: jest.Mock };
+  let realtimeService: { publish: jest.Mock };
   let prisma: {
     assessment: {
       create: jest.Mock;
@@ -46,6 +48,7 @@ describe('AICoachService', () => {
       deductCredit: jest.fn(),
       refundCredit: jest.fn(),
     };
+    realtimeService = { publish: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -53,6 +56,7 @@ describe('AICoachService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: () => 'mock' } },
         { provide: BillingService, useValue: billingService },
+        { provide: AssessmentRealtimeService, useValue: realtimeService },
       ],
     }).compile();
 

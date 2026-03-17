@@ -112,6 +112,8 @@ dynamodb_local/
 
 # pnpm shim for Turbo
 .pnpm-bin/
+.local-bin/
+.local-logs/
 
 # Build outputs
 **/dist

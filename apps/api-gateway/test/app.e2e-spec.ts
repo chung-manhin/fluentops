@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { WsAdapter } from '@nestjs/platform-ws';
 import request, { Response } from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma';
@@ -46,6 +47,7 @@ describe('App (e2e)', () => {
     const moduleFixture: TestingModule = await moduleBuilder.compile();
 
     app = moduleFixture.createNestApplication();
+    app.useWebSocketAdapter(new WsAdapter(app));
     app.setGlobalPrefix('api/v1', { exclude: ['health'] });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();

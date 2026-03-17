@@ -72,6 +72,7 @@ export default {
   'speaking.uploaded': 'Recording uploaded',
   'speaking.uploadFailed': 'Upload failed, please retry',
   'speaking.fileTooLarge': 'File is too large (max 100MB)',
+  'speaking.liveMeter': 'WebRTC meter: {state}',
 
   // Coach
   'coach.submitTitle': 'Submit Text for Assessment',
@@ -88,6 +89,12 @@ export default {
   'coach.refresh': 'Refresh',
   'coach.noHistory': 'No assessments yet.',
   'coach.view': 'View',
+  'coach.realtime': 'WebSocket + SSE live',
+  'coach.averageScore': 'Avg {n}',
+  'coach.emailSummary': 'Email Summary',
+  'coach.downloadPoster': 'Download Poster',
+  'coach.emailSuccess': 'Assessment summary sent',
+  'coach.emailFailed': 'Failed to send summary email',
   'coach.streamError': 'Failed to connect to SSE stream',
   'coach.startError': 'Failed to start assessment',
   'coach.loadError': 'Failed to load assessment',

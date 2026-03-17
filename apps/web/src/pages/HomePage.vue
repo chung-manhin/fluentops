@@ -108,6 +108,10 @@
               </div>
             </div>
 
+            <div class="mt-6">
+              <HeroOrbitScene />
+            </div>
+
             <div class="mt-6 space-y-4">
               <div
                 v-for="item in previewCards"
@@ -175,6 +179,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '../stores/auth';
 import { toggleLocale } from '../i18n';
+import HeroOrbitScene from '../components/HeroOrbitScene.vue';
 
 const authStore = useAuthStore();
 
@@ -196,8 +201,8 @@ const steps = [
 
 const summaryCards = [
   { label: 'AI', value: '4-step', caption: 'diagnose -> rewrite -> drills -> score' },
-  { label: 'SSE', value: 'Live', caption: 'streamed feedback with reconnect support' },
-  { label: 'Flow', value: 'Speak', caption: 'record, assess, revisit, repeat' },
+  { label: 'WS/SSE', value: 'Hybrid', caption: 'websocket first, streaming fallback' },
+  { label: 'Flow', value: 'Speak', caption: 'webrtc capture, assess, revisit, repeat' },
 ];
 
 const previewCards = [

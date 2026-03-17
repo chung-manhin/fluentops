@@ -1,15 +1,19 @@
 import { Injectable, OnModuleInit, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Plan } from '@prisma/client';
 import { PrismaService } from '../prisma';
 import { AlipayService } from './alipay.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class BillingService implements OnModuleInit {
+  private static readonly PLAN_CACHE_KEY = 'billing:plans';
   private readonly logger = new Logger(BillingService.name);
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
     private alipayService: AlipayService,
+    private redis: RedisService,
   ) {}
 
   async onModuleInit() {
@@ -18,10 +22,20 @@ export class BillingService implements OnModuleInit {
       update: {},
       create: { code: 'credits-10', name: '10 AI Credits', type: 'CREDITS', credits: 10, priceCents: 999 },
     });
+    await this.redis.del(BillingService.PLAN_CACHE_KEY);
   }
 
-  listPlans() {
-    return this.prisma.plan.findMany();
+  async listPlans() {
+    const cached = await this.redis.getJson<Plan[]>(
+      BillingService.PLAN_CACHE_KEY,
+    );
+    if (cached) {
+      return cached;
+    }
+
+    const plans = await this.prisma.plan.findMany();
+    await this.redis.setJson(BillingService.PLAN_CACHE_KEY, plans, 60);
+    return plans;
   }
 
   async getBalance(userId: string) {
@@ -51,7 +65,6 @@ export class BillingService implements OnModuleInit {
       );
       return { ...order, payUrl };
     }
-
     return order;
   }
 
